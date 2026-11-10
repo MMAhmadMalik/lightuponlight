@@ -1,0 +1,1548 @@
+<title>Maxwell in 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=STIX+Two+Text:ital,wght@0,400;0,600;1,400;1,600&display=swap">
+<style>
+/* Layout: field-lab bench. WebGL viewport on the left, instrument panel on the right, the 13-step rail across the top.
+   Single dark look on purpose: field colours read best on a dark ground. */
+:root{
+  --bg:#0a0f16; --bg2:#0d141e; --panel:#101823; --raise:#16212e; --line:#223040; --fg:#dfe7f0; --muted:#8d9db1; --faint:#5d6d80; --hi:#f4efe3;
+  --cE:#ff8c42; --cD:#ffcd3c; --cB:#3a8dff; --cH:#2fd6c6; --cJ:#ff4f5e; --cP:#ff7eb6; --cM:#8de05a; --cS:#e05bff; --cF:#f5f5f5; --cA:#d4e157; --ck:#9fb0c8; --cv:#cfd8e3;
+  --cpos:#ff4f5e; --cneg:#b7a6ff; --cphi:#ff9aa8; --cneutral:#e6dfcf;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --math:"STIX Two Text","Cambria Math","Times New Roman",serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font:14px/1.55 var(--sans);overflow:hidden}
+*{box-sizing:border-box}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--hi);outline-offset:2px}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 430px;grid-template-rows:auto minmax(0,1fr);height:100%}
+.top{grid-column:1/-1;display:flex;align-items:center;gap:20px;border-bottom:1px solid var(--line);background:var(--bg2);
+  padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));min-width:0}
+.brand{display:flex;align-items:center;gap:10px;flex:none}
+.home img{width:38px;height:38px;border-radius:50%;display:block}
+.brand p a{color:inherit;text-decoration:none}.brand p a:hover{color:var(--fg)}
+.mark{font:600 26px/1 var(--math);width:38px;height:38px;display:grid;place-items:center;border:1px solid var(--line);border-radius:8px;color:var(--hi);background:var(--raise)}
+.brand h1{font:600 17px/1.1 var(--cond);letter-spacing:.02em;margin:0;text-wrap:balance}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase}
+.rail{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
+.steps{display:flex;gap:4px;overflow-x:auto;scrollbar-width:thin;min-width:0;flex:1;padding-block:2px}
+.step{flex:none;display:flex;align-items:baseline;gap:6px;border:1px solid transparent;background:none;border-radius:6px;padding:5px 9px;cursor:pointer;color:var(--muted);font:500 12.5px/1.2 var(--cond);white-space:nowrap}
+.step b{font:500 11px var(--mono);color:var(--faint)}
+.step:hover{color:var(--fg);background:var(--raise)}
+.step[aria-current="true"]{color:var(--bg);background:var(--hi)}
+.step[aria-current="true"] b{color:var(--bg)}
+.navb{flex:none;width:30px;height:30px;border-radius:6px;border:1px solid var(--line);background:var(--raise);cursor:pointer;font-size:14px}
+.navb:hover{border-color:var(--muted)}
+
+.stage{position:relative;min-height:0;min-width:0;background:var(--bg)}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.eqcard{position:absolute;top:12px;left:max(12px,env(safe-area-inset-left,0px));max-width:min(470px,62%);background:rgba(13,20,30,.82);backdrop-filter:blur(6px);
+  border:1px solid var(--line);border-radius:10px;padding:10px 14px 12px;pointer-events:auto}
+.eqcard h3{margin:0 0 6px;font:600 11px/1.2 var(--cond);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;gap:10px}
+.eqcard h3 button{background:none;border:0;color:var(--muted);cursor:pointer;font:500 11px var(--cond);letter-spacing:.06em;padding:0}
+.eqrow{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;align-items:center;padding:4px 0;border-top:1px solid rgba(255,255,255,.05)}
+.eqrow:first-of-type{border-top:0}
+.eqrow span.l{font:500 10.5px/1.2 var(--cond);color:var(--faint);text-transform:uppercase;letter-spacing:.06em;max-width:110px}
+.eqrow span.r{font:19px/1.35 var(--math);color:var(--hi)}
+.eqcard.min .eqrow{display:none}
+.legend{position:absolute;top:12px;right:max(12px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:4px;background:rgba(13,20,30,.72);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;max-width:44%}
+.legend div{display:flex;align-items:center;gap:7px;white-space:nowrap}
+.legend i{width:16px;height:4px;border-radius:2px;flex:none}
+.legend span{font-family:var(--math);font-size:15px;font-weight:600;min-width:18px}
+.legend em{font-style:normal;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.transport{position:absolute;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));bottom:12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;pointer-events:none}
+.transport>*{pointer-events:auto}
+.tb{height:34px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:rgba(22,33,46,.9);cursor:pointer;font:500 12.5px var(--cond);letter-spacing:.03em;white-space:nowrap}
+.tb:hover{border-color:var(--muted)}
+.tb.primary{background:var(--hi);color:var(--bg);border-color:var(--hi);min-width:44px;font-size:14px}
+.tb[aria-pressed="true"]{border-color:var(--hi);color:var(--hi)}
+.tb[aria-pressed="false"]{color:var(--muted)}
+.spd{display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:rgba(22,33,46,.9);font:500 12px var(--cond);color:var(--muted)}
+.spd input{width:90px}
+.spd output{font:500 12px var(--mono);color:var(--fg);min-width:42px}
+.hint{margin-left:auto;font-size:11.5px;color:var(--faint);background:rgba(10,15,22,.6);padding:4px 8px;border-radius:6px}
+
+.panel{min-height:0;min-width:0;overflow-y:auto;border-left:1px solid var(--line);background:var(--panel);
+  padding-block:0 28px;padding-left:20px;padding-right:max(20px,env(safe-area-inset-right,0px))}
+.tabs{position:sticky;top:0;z-index:2;display:flex;gap:2px;background:var(--panel);padding-block:12px 10px;border-bottom:1px solid var(--line)}
+.tab{flex:1;border:1px solid var(--line);background:none;border-radius:6px;padding:6px 0;cursor:pointer;font:500 12.5px var(--cond);color:var(--muted);letter-spacing:.03em}
+.tab[aria-selected="true"]{background:var(--raise);color:var(--fg);border-color:var(--muted)}
+.view[hidden]{display:none!important}
+.kicker{font:500 11px/1 var(--mono);color:var(--faint);letter-spacing:.08em;margin-top:18px}
+.panel h2{font:600 22px/1.2 var(--cond);margin:6px 0 4px;text-wrap:balance}
+.panel .sub{color:var(--muted);margin:0 0 6px}
+.sec{margin-top:20px}
+.sec>h4{margin:0 0 10px;font:600 11px/1 var(--cond);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+.sec>h4::after{content:"";flex:1;height:1px;background:var(--line)}
+.ctl{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;margin-bottom:10px}
+.ctl label{font-size:13px;color:var(--fg)}
+.ctl output{font:500 12.5px var(--mono);color:var(--hi);font-variant-numeric:tabular-nums}
+.ctl input[type=range]{grid-column:1/-1;width:100%}
+input[type=range]{accent-color:var(--hi);height:18px}
+.tog{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;font-size:13px;cursor:pointer}
+.tog input{width:34px;height:18px;accent-color:var(--hi)}
+.seg{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;grid-column:1/-1}
+.seg button{flex:1;border:1px solid var(--line);background:none;border-radius:6px;padding:5px 8px;font:500 12px var(--cond);cursor:pointer;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--raise);color:var(--fg);border-color:var(--hi)}
+select{grid-column:1/-1;width:100%;background:var(--raise);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+table.ro{width:100%;border-collapse:collapse;font-size:12.5px}
+table.ro td{padding:5px 0;border-bottom:1px solid var(--line);vertical-align:top}
+table.ro td:first-child{color:var(--muted);padding-right:10px}
+table.ro td:first-child b,table.ro td:first-child i{font-family:var(--math);font-size:14px;color:var(--fg)}
+table.ro td:last-child{text-align:right;font:500 12.5px var(--mono);font-variant-numeric:tabular-nums;color:var(--fg);white-space:nowrap}
+.chartbox{background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:8px}
+.chartbox canvas{width:100%;height:120px;display:block}
+.chartleg{display:flex;gap:14px;font-size:11.5px;color:var(--muted);margin-top:4px;flex-wrap:wrap}
+.chartleg i{display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+dl.qa{margin:0}
+dl.qa dt{font:600 12px/1.3 var(--cond);letter-spacing:.04em;color:var(--hi);margin-top:14px;display:flex;gap:8px}
+dl.qa dt span{font:500 11px var(--mono);color:var(--faint)}
+dl.qa dd{margin:4px 0 0;color:#c7d2de;max-width:65ch}
+.vec{font-family:var(--math);font-weight:600;font-style:normal}
+.m{font-family:var(--math);font-size:1.08em}
+.fr{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;font-size:.86em;line-height:1.1;margin:0 2px}
+.fr>span:first-child{border-bottom:1px solid currentColor;padding:0 2px}
+.panel .fr{font-size:.9em}
+.eqbig{background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:8px}
+.eqbig h5{margin:0 0 6px;font:600 12.5px var(--cond);letter-spacing:.03em;color:var(--fg);display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.eqbig h5 button{background:none;border:1px solid var(--line);border-radius:5px;color:var(--muted);font:500 11px var(--cond);padding:2px 7px;cursor:pointer}
+.eqbig .row{display:grid;grid-template-columns:86px 1fr;gap:8px;align-items:center;padding:3px 0}
+.eqbig .row span:first-child{font:500 10.5px var(--cond);text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
+.eqbig .row span:last-child{font:17px/1.4 var(--math);color:var(--hi);min-width:0;overflow-x:auto}
+.eqbig p{margin:6px 0 0;color:var(--muted);font-size:12.5px}
+.symwrap{overflow-x:auto}
+table.sym{width:100%;border-collapse:collapse;font-size:12.5px}
+table.sym th{text-align:left;font:600 10.5px var(--cond);letter-spacing:.08em;text-transform:uppercase;color:var(--faint);padding:6px 6px 6px 0;border-bottom:1px solid var(--line)}
+table.sym td{padding:6px 6px 6px 0;border-bottom:1px solid var(--line);vertical-align:top}
+table.sym td:first-child{font:17px var(--math);white-space:nowrap}
+table.sym td:nth-child(3){font:12px var(--mono);color:var(--muted);white-space:nowrap}
+table.sym tr.grp td{font:600 11px var(--cond);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-top:14px;font-family:var(--cond)}
+.sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.note{font-size:12.5px;color:var(--muted);border-left:2px solid var(--line);padding-left:10px;margin-top:12px}
+.loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font:500 13px var(--cond);letter-spacing:.05em}
+.err{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:var(--fg)}
+
+@media (max-width:980px){
+  body{overflow:auto}
+  .app{display:block;height:auto}
+  .top{flex-direction:column;align-items:stretch;gap:8px}
+  .stage{height:66svh;min-height:380px}
+  .panel{border-left:0;border-top:1px solid var(--line);overflow:visible;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .eqcard{max-width:calc(100% - 24px);padding:8px 10px}
+  .eqrow span.r{font-size:15.5px}
+  .eqrow span.l{display:none}
+  .eqrow{grid-template-columns:1fr}
+  .legend{top:auto;bottom:88px;left:max(12px,env(safe-area-inset-left,0px));right:auto;flex-direction:row;flex-wrap:wrap;gap:4px 10px;font-size:11px;max-width:calc(100% - 24px);padding:6px 8px}
+  .legend em{display:none}
+  .tb{height:32px;padding:0 9px;font-size:12px}
+  .spd{height:32px}
+  .hint{display:none}
+  .spd input{width:70px}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><a class="home" href="../../index.html" title="Back to Light upon Light"><img src="../../assets/logo-64.png" alt="Light upon Light home" width="38" height="38"></a><div><h1>Maxwell in 3D</h1><p><a href="../../index.html">Light upon Light</a> · Interactive field lab</p></div></div>
+    <div class="rail">
+      <button class="navb" id="prev" aria-label="Previous step">‹</button>
+      <nav class="steps" id="steps" aria-label="Steps"></nav>
+      <button class="navb" id="next" aria-label="Next step">›</button>
+    </div>
+  </header>
+  <main class="stage" id="stage">
+    <canvas id="gl" aria-label="3D field visualisation"></canvas>
+    <div class="loading" id="loading">Loading the 3D engine…</div>
+    <div class="eqcard" id="eqcard"></div>
+    <div class="legend" id="legend"></div>
+    <div class="transport" role="toolbar" aria-label="Animation controls">
+      <button class="tb primary" id="bPlay" aria-label="Pause">❚❚</button>
+      <button class="tb" id="bReset">Reset step</button>
+      <button class="tb" id="bSlow" aria-pressed="false">Slow-mo ¼×</button>
+      <label class="spd" for="spd">Speed <input id="spd" type="range" min="0.1" max="2" step="0.05" value="1"><output id="spdO">1.00×</output></label>
+      <button class="tb" id="bView">Reset view</button>
+      <button class="tb" id="bAxes" aria-pressed="true">Axes</button>
+      <button class="tb" id="bLabels" aria-pressed="true">Labels</button>
+      <span class="hint">Drag to rotate · scroll/pinch to zoom · right-drag to pan · Space = play/pause · ←/→ = step</span>
+    </div>
+  </main>
+  <aside class="panel" id="panel">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tStep" aria-selected="true">This step</button>
+      <button class="tab" role="tab" id="tEq" aria-selected="false">All equations</button>
+      <button class="tab" role="tab" id="tSym" aria-selected="false">Symbols &amp; units</button>
+    </div>
+    <section class="view" id="vStep"></section>
+    <section class="view" id="vEq" hidden></section>
+    <section class="view" id="vSym" hidden></section>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+"use strict";
+/* ================================================================
+   Constants (SI)
+   ================================================================ */
+const EPS0 = 8.8541878128e-12;      // F/m
+const MU0  = 1.25663706212e-6;      // N/A^2
+const C0   = 1/Math.sqrt(MU0*EPS0); // m/s
+const KE   = 1/(4*Math.PI*EPS0);    // N m^2 / C^2
+const QE   = 1.602176634e-19;       // C
+const MP   = 1.67262192369e-27;     // kg
+const TAU  = Math.PI*2;
+
+const COL = {E:'#ff8c42',D:'#ffcd3c',B:'#3a8dff',H:'#2fd6c6',J:'#ff4f5e',P:'#ff7eb6',M:'#8de05a',S:'#e05bff',F:'#f5f5f5',
+  A:'#d4e157',k:'#9fb0c8',v:'#cfd8e3',pos:'#ff4f5e',neg:'#b7a6ff',phi:'#ff9aa8',neutral:'#e6dfcf',dD:'#fff0b8',fin:'#b7a6ff',copper:'#d98b4f'};
+
+const LEG = {
+  E:['E','Electric field','E'], D:['D','Displacement field','D'], dD:['∂D/∂t','Displacement current','dD'], B:['B','Magnetic flux density','B'], H:['H','Magnetic field strength','H'],
+  J:['J','Current / moving + charge','J'], P:['P','Polarization','P'], M:['M','Magnetization','M'], S:['S','Poynting vector','S'],
+  F:['F','Force','F'], A:['A','Vector potential','A'], k:['k','Wave vector','k'], v:['v','Velocity','v'],
+  pos:['+q','Positive charge','pos'], neg:['−q','Negative charge','neg'], phi:['φ','Potential (sheet)','phi'], fin:['in','Inward flux','neg'], F0:['F','Generic vector field','neutral']
+};
+
+/* ================================================================
+   Math HTML helpers
+   ================================================================ */
+const m = {};
+['E','D','B','H','J','P','M','S','F','A','k','v'].forEach(s => m[s] = `<b class="vec" style="color:var(--c${s})">${s}</b>`);
+m.da = 'd<b class="vec">a</b>'; m.dl = 'd<b class="vec">l</b>'; m.n = '<b class="vec">n̂</b>'; m.r = '<b class="vec">r</b>'; m.rh='<b class="vec">r̂</b>';
+m.Fg = '<b class="vec">F</b>'; m.K = '<b class="vec" style="color:var(--cM)">K</b>'; m.kh = '<b class="vec" style="color:var(--ck)">k̂</b>';
+const fr = (a,b) => `<span class="fr"><span>${a}</span><span>${b}</span></span>`;
+const pd = x => fr('∂'+x,'∂<i>t</i>');
+const ddt = fr('d','d<i>t</i>');
+const e0 = '<i>ε</i><sub>0</sub>', u0 = '<i>μ</i><sub>0</sub>';
+
+const EQ = {
+  gaussE: {name:"Gauss's law for electricity", diff:`∇·${m.D} = <i>ρ</i><sub>f</sub>`, int:`∯<sub>∂V</sub> ${m.D}·${m.da} = <i>Q</i><sub>f,enc</sub>`,
+           vdiff:`∇·${m.E} = <i>ρ</i>/${e0}`, vint:`∯ ${m.E}·${m.da} = <i>Q</i><sub>enc</sub>/${e0}`, step:2,
+           say:'Electric charge is the source (or sink) of electric flux. Net outward D-flux through any closed surface equals the free charge inside.'},
+  gaussB: {name:"Gauss's law for magnetism", diff:`∇·${m.B} = 0`, int:`∯<sub>∂V</sub> ${m.B}·${m.da} = 0`, vdiff:`∇·${m.B} = 0`, vint:`∯ ${m.B}·${m.da} = 0`, step:4,
+           say:'There are no magnetic charges. Every B-line that enters a closed surface also leaves it; field lines close on themselves.'},
+  faraday:{name:"Faraday's law of induction", diff:`∇×${m.E} = −${pd(m.B)}`, int:`∮<sub>∂Σ</sub> ${m.E}·${m.dl} = −${ddt}∬<sub>Σ</sub> ${m.B}·${m.da}`,
+           vdiff:`∇×${m.E} = −${pd(m.B)}`, vint:`ℰ = −d<i>Φ</i><sub>B</sub>/d<i>t</i>`, step:5,
+           say:'A magnetic field that changes in time creates a circulating electric field. Its circulation (the EMF) equals minus the rate of change of magnetic flux.'},
+  ampere: {name:"Ampère–Maxwell law", diff:`∇×${m.H} = ${m.J}<sub>f</sub> + ${pd(m.D)}`, int:`∮<sub>∂Σ</sub> ${m.H}·${m.dl} = <i>I</i><sub>f,enc</sub> + ${ddt}∬<sub>Σ</sub> ${m.D}·${m.da}`,
+           vdiff:`∇×${m.B} = ${u0}${m.J} + ${u0}${e0}${pd(m.E)}`, vint:`∮ ${m.B}·${m.dl} = ${u0}<i>I</i><sub>enc</sub> + ${u0}${e0}${ddt}<i>Φ</i><sub>E</sub>`, step:6,
+           say:'Free currents and changing electric displacement both create a circulating magnetic field.'}
+};
+
+/* ================================================================
+   Formatting
+   ================================================================ */
+const PFX = [[1e12,'T'],[1e9,'G'],[1e6,'M'],[1e3,'k'],[1,''],[1e-3,'m'],[1e-6,'µ'],[1e-9,'n'],[1e-12,'p'],[1e-15,'f']];
+function si(x,unit,d=3){
+  if (!isFinite(x)) return '—';
+  if (x === 0) return '0 '+unit;
+  const a = Math.abs(x);
+  for (const [f,p] of PFX){ if (a >= f*0.9995){ let s=(x/f).toPrecision(d); if (s.includes('e')) s=(x/f).toFixed(0); return s+' '+p+unit; } }
+  return x.toExponential(2)+' '+unit;
+}
+function sci(x,unit,d=4){ if(!isFinite(x)) return '—'; const s=x.toExponential(d-1).replace('e',' × 10^'); return s.replace(/\^([+-]?)(\d+)/,(_,sg,n)=>'<sup>'+(sg==='-'?'−':'')+n+'</sup>')+' '+unit; }
+function vecSI(v,unit){
+  const mx = Math.max(Math.abs(v.x),Math.abs(v.y),Math.abs(v.z));
+  if (mx===0) return '(0, 0, 0) '+unit;
+  let f=1,p=''; for (const [ff,pp] of PFX){ if (mx>=ff*0.9995){f=ff;p=pp;break;} }
+  const c = x => { const s=(x/f).toFixed(Math.abs(x/f)>=100?0:Math.abs(x/f)>=10?1:2); return s==='-0.00'||s==='-0.0'||s==='-0'?s.slice(1):s; };
+  return `(${c(v.x)}, ${c(v.y)}, ${c(v.z)}) ${p}${unit}`;
+}
+const fx = (x,d=2) => (+x).toFixed(d);
+const sgn = x => x>0?'+':x<0?'−':'';
+
+/* ================================================================
+   Three.js setup
+   ================================================================ */
+const canvas = document.getElementById('gl');
+const stage = document.getElementById('stage');
+if (typeof THREE === 'undefined'){ document.getElementById('loading').outerHTML='<div class="err">The 3D engine (three.js) could not be loaded. Check your connection and reload the page.</div>'; throw new Error('THREE missing'); }
+document.getElementById('loading').remove();
+
+const V3 = THREE.Vector3;
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#0a0f16');
+scene.fog = new THREE.Fog('#0a0f16', 40, 90);
+const camera = new THREE.PerspectiveCamera(42, 1, 0.05, 400);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08; controls.minDistance = 3; controls.maxDistance = 70;
+scene.add(new THREE.AmbientLight(0xffffff, 0.62));
+const dl = new THREE.DirectionalLight(0xffffff, 0.55); dl.position.set(6,12,9); scene.add(dl);
+const dl2 = new THREE.DirectionalLight(0x99bbff, 0.2); dl2.position.set(-8,-4,-6); scene.add(dl2);
+
+const world = new THREE.Group(); scene.add(world);
+const axesGroup = new THREE.Group(); scene.add(axesGroup);
+
+function resize(){
+  const r = stage.getBoundingClientRect();
+  const w = Math.max(1, r.width), h = Math.max(1, r.height);
+  renderer.setSize(w, h, false); camera.aspect = w/h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+
+/* ================================================================
+   Reusable drawing primitives
+   ================================================================ */
+const SHARED = new Set();
+const G_SHAFT = new THREE.CylinderGeometry(1,1,1,10,1,false); G_SHAFT.translate(0,0.5,0); SHARED.add(G_SHAFT);
+const G_HEAD  = new THREE.ConeGeometry(1,1,16,1); G_HEAD.translate(0,0.5,0); SHARED.add(G_HEAD);
+const G_SPH   = new THREE.SphereGeometry(1,28,18); SHARED.add(G_SPH);
+const UP = new V3(0,1,0);
+const _am = new THREE.Matrix4(), _aq = new THREE.Quaternion(), _as = new V3(), _ad = new V3(), _ap = new V3(), _ac = new THREE.Color();
+
+const DOT_TEX = (() => { const c=document.createElement('canvas'); c.width=c.height=64; const g=c.getContext('2d');
+  const gr=g.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(.4,'rgba(255,255,255,.85)'); gr.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle=gr; g.fillRect(0,0,64,64); const t=new THREE.CanvasTexture(c); return t; })();
+
+/** Instanced 3D arrows: cylinder shaft + cone head, per-instance colour. */
+class Arrows {
+  constructor(n, color, w=0.04, opts={}){
+    this.n=n; this.w=w; this.base=new THREE.Color(color);
+    const mat = new THREE.MeshLambertMaterial({color:0xffffff, transparent:opts.opacity!=null, opacity:opts.opacity??1, depthWrite:opts.opacity==null});
+    this.sh = new THREE.InstancedMesh(G_SHAFT, mat, n);
+    this.hd = new THREE.InstancedMesh(G_HEAD, mat, n);
+    this.group = new THREE.Group(); this.group.add(this.sh, this.hd);
+    for (const mm of [this.sh,this.hd]){ mm.frustumCulled=false; mm.instanceMatrix.setUsage(THREE.DynamicDrawUsage); }
+    for (let i=0;i<n;i++){ this.sh.setColorAt(i,this.base); this.hd.setColorAt(i,this.base); this.hide(i); }
+    this.flush();
+  }
+  hide(i){ _am.makeScale(0,0,0); this.sh.setMatrixAt(i,_am); this.hd.setMatrixAt(i,_am); }
+  /** p = tail position, dir = direction (any length), L = drawn length */
+  set(i, p, dir, L, bright=1, w=null, col=null){
+    w = w||this.w;
+    const l = dir.length();
+    if (!(L>1e-3) || !(l>1e-30)){ this.hide(i); return; }
+    _ad.copy(dir).divideScalar(l);
+    _aq.setFromUnitVectors(UP,_ad);
+    const hl = Math.min(L*0.42, w*6.5), sl = L-hl;
+    _as.set(w, Math.max(sl,1e-4), w); _am.compose(p,_aq,_as); this.sh.setMatrixAt(i,_am);
+    _ap.copy(p).addScaledVector(_ad, sl); _as.set(w*2.7, hl, w*2.7); _am.compose(_ap,_aq,_as); this.hd.setMatrixAt(i,_am);
+    if (col) _ac.set(col); else _ac.copy(this.base);
+    _ac.multiplyScalar(bright); this.sh.setColorAt(i,_ac); this.hd.setColorAt(i,_ac);
+  }
+  /** centred on c */
+  setC(i, c, dir, L, bright=1, w=null, col=null){
+    const l=dir.length(); if (!(l>1e-30)){ this.hide(i); return; }
+    const p = new V3().copy(c).addScaledVector(dir, -0.5*L/l);
+    this.set(i,p,dir,L,bright,w,col);
+  }
+  setColor(c){ this.base.set(c); }
+  flush(){ for (const mm of [this.sh,this.hd]){ mm.instanceMatrix.needsUpdate=true; if (mm.instanceColor) mm.instanceColor.needsUpdate=true; } }
+}
+
+/** Field lines drawn as thin tubes, with glowing dots flowing along them. */
+class Flow {
+  constructor(color, o={}){
+    this.o = Object.assign({tube:0.02, opacity:0.45, spacing:1.1, dot:0.22, speed:1.4}, o);
+    this.group = new THREE.Group(); this.lines=[]; this.pts=null;
+    this.mat = new THREE.MeshBasicMaterial({color, transparent:true, opacity:this.o.opacity, depthWrite:false});
+    this.pmat = new THREE.PointsMaterial({color, size:this.o.dot, map:DOT_TEX, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending});
+  }
+  set(polys, ks){
+    for (const c of [...this.group.children]){ this.group.remove(c); c.geometry.dispose(); }
+    this.lines=[]; this.pts=null; let nd=0;
+    polys.forEach((poly,i) => {
+      if (!poly || poly.length<2) return;
+      const cum=[0]; for (let j=1;j<poly.length;j++) cum.push(cum[j-1]+poly[j].distanceTo(poly[j-1]));
+      const len = cum[cum.length-1]; if (len<0.05) return;
+      if (this.o.tube>0){
+        let cp = downsample(poly, 180); if (poly.closed && cp.length>3) cp = cp.slice(0,-1);
+        if (cp.length>=2){
+          const curve = new THREE.CatmullRomCurve3(cp, !!poly.closed);
+          const g = new THREE.TubeGeometry(curve, Math.min(260, cp.length*2), this.o.tube, 5, !!poly.closed);
+          this.group.add(new THREE.Mesh(g, this.mat));
+        }
+      }
+      const n = Math.max(1, Math.round(len/this.o.spacing));
+      this.lines.push({poly, cum, len, n, k: ks? ks[i] : 1, ph: Math.random()*len, off: nd}); nd+=n;
+    });
+    if (nd){
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nd*3),3));
+      this.pts = new THREE.Points(g, this.pmat); this.pts.frustumCulled=false; this.group.add(this.pts);
+    }
+    this.update(0);
+  }
+  update(dt, mult=1){
+    if (!this.pts) return;
+    const a = this.pts.geometry.attributes.position.array;
+    for (const L of this.lines){
+      L.ph = (L.ph + dt*this.o.speed*mult*L.k) % L.len;
+      const gap = L.len/L.n;
+      for (let j=0;j<L.n;j++){ let s=((L.ph + j*gap)%L.len + L.len)%L.len; pointAt(L, s, a, (L.off+j)*3); }
+    }
+    this.pts.geometry.attributes.position.needsUpdate = true;
+  }
+}
+function pointAt(L, s, a, o){
+  const c=L.cum; let lo=0, hi=c.length-1;
+  while (hi-lo>1){ const mid=(lo+hi)>>1; if (c[mid]<=s) lo=mid; else hi=mid; }
+  const t=(s-c[lo])/((c[hi]-c[lo])||1), p=L.poly[lo], q=L.poly[hi];
+  a[o]=p.x+(q.x-p.x)*t; a[o+1]=p.y+(q.y-p.y)*t; a[o+2]=p.z+(q.z-p.z)*t;
+}
+function downsample(poly, max){
+  if (poly.length<=max) return poly.slice();
+  const st=Math.ceil(poly.length/max), out=[];
+  for (let i=0;i<poly.length;i+=st) out.push(poly[i]);
+  if (out[out.length-1]!==poly[poly.length-1]) out.push(poly[poly.length-1]);
+  return out;
+}
+
+/** Canvas text sprite (always faces the camera). */
+function label(text, o={}){
+  const color=o.color||'#dfe7f0', size=o.size||0.55;
+  const fam = o.sans ? '"IBM Plex Sans", system-ui, sans-serif' : '"STIX Two Text", "Times New Roman", serif';
+  const style = (o.italic===false||o.sans ? '' : 'italic ') + (o.weight||(o.sans?500:600)) + ' ';
+  const fs=64, c=document.createElement('canvas'), g=c.getContext('2d');
+  const font = `${style}${fs}px ${fam}`; g.font=font;
+  const w=Math.ceil(g.measureText(text).width)+28; c.width=w; c.height=Math.round(fs*1.45);
+  g.font=font; g.textBaseline='middle';
+  g.lineWidth=10; g.strokeStyle='rgba(10,15,22,.85)'; g.lineJoin='round'; g.strokeText(text,14,c.height/2+2);
+  g.fillStyle=color; g.fillText(text,14,c.height/2+2);
+  const tex=new THREE.CanvasTexture(c); tex.minFilter=THREE.LinearFilter;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex, depthTest:false, transparent:true}));
+  sp.scale.set(size*c.width/c.height, size, 1); sp.renderOrder=20; sp.userData.isLabel=true; sp.visible=app.showLabels;
+  return sp;
+}
+const vlabel = (s,col,size=0.6) => label(s,{color:col,italic:false,size});
+
+function disposeTree(o){
+  o.traverse(n => {
+    if (n.geometry && !SHARED.has(n.geometry)) n.geometry.dispose();
+    if (n.material){ (Array.isArray(n.material)?n.material:[n.material]).forEach(mt => { if (mt.map && mt.map!==DOT_TEX) mt.map.dispose(); mt.dispose(); }); }
+  });
+}
+function clearGroup(g){ for (const c of [...g.children]){ g.remove(c); disposeTree(c); } }
+
+function makeAxes(L, unit){
+  clearGroup(axesGroup);
+  const ar = new Arrows(3,'#7d8ea3',0.016);
+  const o = new V3(0,0,0);
+  [[1,0,0],[0,1,0],[0,0,1]].forEach((d,i)=> ar.set(i,o,new V3(...d),L,1)); ar.flush(); axesGroup.add(ar.group);
+  const neg=[]; [[1,0,0],[0,1,0],[0,0,1]].forEach(d=>{ neg.push(new V3(0,0,0), new V3(-d[0]*L,-d[1]*L,-d[2]*L)); });
+  const ng=new THREE.BufferGeometry().setFromPoints(neg);
+  const nl=new THREE.LineSegments(ng,new THREE.LineDashedMaterial({color:0x4f5f73,dashSize:.25,gapSize:.18})); nl.computeLineDistances(); axesGroup.add(nl);
+  const tk=[]; const step = L>12? 5 : 2;
+  for (let v=step; v<L-0.3; v+=step){ tk.push(new V3(v,-.12,0),new V3(v,.12,0), new V3(-.12,v,0),new V3(.12,v,0), new V3(0,-.12,v),new V3(0,.12,v)); }
+  axesGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(tk), new THREE.LineBasicMaterial({color:0x7d8ea3})));
+  const u = unit? ` (${unit})` : '';
+  [['x',[L+0.9,0,0]],['y',[0,L+0.6,0]],['z',[0,0,L+0.9]]].forEach(([s,p])=>{ const lb=label(s+u,{color:'#aebccc',size:0.5}); lb.position.set(...p); axesGroup.add(lb); });
+  if (step && unit){ const t=label(`${step} ${unit}`,{sans:true,size:.32,color:'#7d8ea3'}); t.position.set(step,-.45,0); axesGroup.add(t); }
+}
+
+/* generic helpers */
+function range(a,b,s){ const r=[]; for (let v=a; v<=b+1e-9; v+=s) r.push(+v.toFixed(6)); return r; }
+function gridPts(xs,ys,zs){ const r=[]; for (const x of xs) for (const y of ys) for (const z of zs) r.push(new V3(x,y,z)); return r; }
+function fib(n){ const a=[], g=Math.PI*(3-Math.sqrt(5)); for (let i=0;i<n;i++){ const y=1-2*(i+0.5)/n, r=Math.sqrt(1-y*y); a.push(new V3(Math.cos(g*i)*r, y, Math.sin(g*i)*r)); } return a; }
+const sat = (x,ref) => Math.tanh(Math.abs(x)/ref);
+const rand = (a,b) => a+Math.random()*(b-a);
+/** azimuthal unit vector around the y axis: φ̂ = ŷ × ρ̂ */
+function phiHat(p,out){ const r=Math.hypot(p.x,p.z)||1e-9; return out.set(p.z/r,0,-p.x/r); }
+/** circle around the y axis, ordered along +φ̂ */
+function circlePoly(rho, y, n=72, cx=0, cz=0){ const a=[]; for (let i=0;i<=n;i++){ const t=TAU*i/n; a.push(new V3(cx+rho*Math.cos(t), y, cz-rho*Math.sin(t))); } a.closed=true; return a; }
+function ringPts(radii, ys, nAz, phase=0){ const r=[]; for (const y of ys) for (const rho of radii) for (let i=0;i<nAz;i++){ const t=TAU*(i+phase)/nAz; r.push(new V3(rho*Math.cos(t), y, -rho*Math.sin(t))); } return r; }
+function trace(field, p0, sign, o={}){
+  const h=o.h||0.06, max=o.max||800; const pts=[p0.clone()], p=p0.clone(), k1=new V3(), k2=new V3(), t=new V3();
+  for (let i=0;i<max;i++){
+    field(p,k1); let l=k1.length(); if (!(l>1e-30)) break; k1.multiplyScalar(sign*h/l);
+    t.copy(p).addScaledVector(k1,0.5); field(t,k2); l=k2.length(); if (!(l>1e-30)) break; k2.multiplyScalar(sign*h/l);
+    p.add(k2); pts.push(p.clone());
+    if (o.stop && o.stop(p,i)) break;
+  }
+  return pts;
+}
+function mkMesh(geo, o){ return new THREE.Mesh(geo, new THREE.MeshStandardMaterial(Object.assign({roughness:.45, metalness:.15}, o))); }
+function glass(color, opacity=0.1){ return new THREE.MeshBasicMaterial({color, transparent:true, opacity, depthWrite:false, side:THREE.DoubleSide}); }
+function pointsCloud(n, color, size=0.18, additive=true){
+  const g=new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n*3),3));
+  const p=new THREE.Points(g,new THREE.PointsMaterial({color,size,map:DOT_TEX,transparent:true,depthWrite:false,blending:additive?THREE.AdditiveBlending:THREE.NormalBlending}));
+  p.frustumCulled=false; return p;
+}
+
+/* ---------- electrostatics helpers (lengths in cm, charges in C, E in V/m) ---------- */
+function chargeField(charges){
+  const t=new V3();
+  return (p,out) => { out.set(0,0,0); for (const c of charges){ if (!c.q) continue; t.subVectors(p,c.p); const r2=t.lengthSq(); if (r2<1e-8) continue; const r=Math.sqrt(r2); out.addScaledVector(t, KE*c.q*1e4/(r2*r)); } return out; };
+}
+function chargeLines(charges, field, perNC=3.2, Rmax=13){
+  const live = charges.filter(c=>c.q);
+  if (!live.length) return [];
+  const net = live.reduce((s,c)=>s+c.q,0);
+  const sign = net>=0? 1 : -1;
+  const src = live.filter(c=> sign>0 ? c.q>0 : c.q<0);
+  const polys=[];
+  for (const c of src){
+    const N = Math.max(2, Math.round(Math.abs(c.q*1e9)*perNC));
+    for (const d of fib(N)){
+      const start = c.p.clone().addScaledVector(d,0.3);
+      const poly = trace(field, start, sign, {h:0.07, max:600, stop:(p)=> p.length()>Rmax || live.some(o=>o!==c && p.distanceTo(o.p)<0.28)});
+      if (sign<0) poly.reverse();
+      polys.push(poly);
+    }
+  }
+  return polys;
+}
+function chargeBalls(root, n){
+  const balls=[], labs=new THREE.Group(); root.add(labs);
+  for (let i=0;i<n;i++){ const b=mkMesh(G_SPH,{color:'#888'}); root.add(b); balls.push(b); }
+  return (ch) => {
+    clearGroup(labs);
+    ch.forEach((c,i)=>{ const b=balls[i]; b.position.copy(c.p); const qn=c.q*1e9; b.scale.setScalar(0.17+0.025*Math.abs(qn));
+      const col = qn>0?COL.pos:qn<0?COL.neg:'#5d6d80'; b.material.color.set(col); b.material.emissive.set(col).multiplyScalar(0.45);
+      const L=label(`q${'₁₂₃'[i]} = ${qn>0?'+':qn<0?'−':''}${Math.abs(qn).toFixed(1)} nC`,{sans:true,size:.4,color:col}); L.position.copy(c.p).add(new V3(0,0.85,0)); labs.add(L); });
+  };
+}
+/** potential heat-map sheet in the plane z = 0 (x right, y up) */
+function potentialSheet(w,h,cw,chh){
+  const c=document.createElement('canvas'); c.width=cw; c.height=chh; const g=c.getContext('2d');
+  const tex=new THREE.CanvasTexture(c); tex.minFilter=THREE.LinearFilter;
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false,side:THREE.DoubleSide}));
+  const pos=new THREE.Color(COL.pos), neg=new THREE.Color(COL.neg);
+  return { mesh, draw(fn, ref, step){
+    const img=g.createImageData(cw,chh), d=img.data, vals=new Float32Array(cw*chh), lev=new Int32Array(cw*chh);
+    for (let j=0;j<chh;j++) for (let i=0;i<cw;i++){ const x=-w/2+(i+.5)/cw*w, y=h/2-(j+.5)/chh*h; const v=fn(x,y); vals[j*cw+i]=v; lev[j*cw+i]=Math.max(-60,Math.min(60,Math.floor(v/step))); }
+    for (let j=0;j<chh;j++) for (let i=0;i<cw;i++){
+      const k=j*cw+i, v=vals[k], t=Math.tanh(v/ref), cc=t>=0?pos:neg, a=Math.abs(t);
+      let r=cc.r*255, gg=cc.g*255, b=cc.b*255, al=(0.10+0.55*a);
+      const edge = (i<cw-1 && lev[k]!==lev[k+1]) || (j<chh-1 && lev[k]!==lev[k+cw]);
+      if (edge && Math.abs(lev[k])<55){ r=gg=b=235; al=0.6; }
+      d[k*4]=r; d[k*4+1]=gg; d[k*4+2]=b; d[k*4+3]=al*255;
+    }
+    g.putImageData(img,0,0); tex.needsUpdate=true;
+  }};
+}
+/** vertex-colour a closed surface by its normal flux density, returns nothing */
+function colorSurface(mesh, field, outCol, inCol, ref){
+  const g=mesh.geometry, P=g.attributes.position, N=g.attributes.normal;
+  let C=g.attributes.color; if (!C){ C=new THREE.BufferAttribute(new Float32Array(P.count*3),3); g.setAttribute('color',C); }
+  const p=new V3(), n=new V3(), f=new V3(), co=new THREE.Color(outCol), ci=new THREE.Color(inCol), base=new THREE.Color('#1b2533'), tmp=new THREE.Color();
+  for (let i=0;i<P.count;i++){
+    p.fromBufferAttribute(P,i).applyMatrix4(mesh.matrixWorld); n.fromBufferAttribute(N,i);
+    field(p,f); const fn=f.dot(n); const t=Math.tanh(Math.abs(fn)/ref);
+    tmp.copy(base).lerp(fn>=0?co:ci, 0.25+0.75*t); C.setXYZ(i,tmp.r,tmp.g,tmp.b);
+  }
+  C.needsUpdate=true;
+}
+
+/* ---------- mini chart (history of two signals) ---------- */
+function History(n=260){ return {t:[], s:[[],[]], n, acc:0, push(t,a,b){ this.t.push(t); this.s[0].push(a); this.s[1].push(b); if (this.t.length>this.n){ this.t.shift(); this.s[0].shift(); this.s[1].shift(); } }}; }
+
+/* ================================================================
+   App state
+   ================================================================ */
+const app = { i:0, t:0, playing:true, speed:1, slow:false, P:{}, inst:null, dirty:new Set(), showLabels:true, showAxes:true, def:null, roRows:[], lastRO:0 };
+if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) app.playing=false;
+
+/* ================================================================
+   SCENES
+   ================================================================ */
+const Q6 = ['What is happening physically?','What causes it?','What is being generated?','Which direction does the field point?','What does the equation tell us?','What happens when you change the parameters?'];
+
+const SCENES = [
+
+/* ---------------------------------------------------------------- 1 */
+{ key:'charges', short:'Charges & E', title:'Electric charge and its field', sub:'Coulomb’s law, superposition, the potential φ and the force on a test charge.',
+  cam:[3,6,18], axis:7, unit:'cm', legend:['E','pos','neg','phi'],
+  eq:[['Coulomb field', `${m.E} = ${fr('1','4π'+e0)}${fr('<i>q</i>','<i>r</i><sup>2</sup>')}${m.rh}`],
+      ['Potential', `${m.E} = −∇<i>φ</i>,&nbsp; <i>φ</i> = ${fr('<i>q</i>','4π'+e0+'<i>r</i>')}`],
+      ['Test charge', `${m.F} = <i>q</i>${m.E}`]],
+  params:[
+    {k:'q1',l:'Charge q₁',min:-10,max:10,step:0.5,v:4,u:'nC'},
+    {k:'q2',l:'Charge q₂',min:-10,max:10,step:0.5,v:-4,u:'nC'},
+    {k:'d',l:'Separation d',min:2,max:9,step:0.1,v:5,u:'cm'},
+    {k:'px',l:'Probe position x',min:-7,max:7,step:0.1,v:0,u:'cm'},
+    {k:'py',l:'Probe position y',min:-5,max:5,step:0.1,v:2.5,u:'cm'},
+    {k:'grid',l:'3D arrow grid of E',type:'toggle',v:true},
+    {k:'lines',l:'Field lines',type:'toggle',v:true},
+    {k:'pot',l:'Potential φ on the xy-plane',type:'toggle',v:true}],
+  explain:[
+    `Two point charges sit on the x-axis. Each one fills all of space with an electric field ${m.E}. The orange arrows sample ${m.E} on a 3D grid; the glowing lines are field lines, and the dots run along them in the direction of ${m.E}. The coloured sheet in the xy-plane is the electric potential <i>φ</i> (also written <i>V</i>): red where it is positive, lavender where negative, with white equipotential contours.`,
+    `Electric charge <i>q</i> (unit: coulomb, C). A charge at rest is the simplest source of an electric field. Charge density <i>ρ</i> (C/m³) is just charge per volume, so a point charge is a very concentrated <i>ρ</i>.`,
+    `A vector field ${m.E} (V/m = N/C) defined at every point, and a scalar potential <i>φ</i> (V) whose downhill slope is ${m.E}. A test charge placed anywhere feels the force ${m.F} = <i>q</i>${m.E}. Fields of several charges simply add (superposition).`,
+    `${m.E} points radially away from a positive charge and toward a negative one. Field lines start on + charge and end on − charge, and they always cross equipotentials at right angles, pointing from high to low <i>φ</i>.`,
+    `${m.E}(${m.r}) = Σ <i>q</i><sub>i</sub>(${m.r} − ${m.r}<sub>i</sub>)/(4π${e0}|${m.r} − ${m.r}<sub>i</sub>|³) and <i>φ</i> = Σ <i>q</i><sub>i</sub>/(4π${e0}|${m.r} − ${m.r}<sub>i</sub>|), with ${m.E} = −∇<i>φ</i>. The vacuum permittivity ${e0} = 8.854 × 10⁻¹² F/m sets how strong a field a given charge produces in empty space. The field falls off as 1/<i>r</i>² because the same flux spreads over a sphere of area 4π<i>r</i>² (this is Gauss’s law, step 3).`,
+    `Double a charge: <i>E</i> and <i>φ</i> double everywhere and twice as many field lines leave it. Give both charges the same sign: a zero-field point appears between them and lines repel. Set q₂ = 0 to see the pure radial Coulomb field. Move the probe and watch the readout: |<i>E</i>| grows as 1/<i>r</i>² near a charge.`],
+  create({root,P}){
+    const ch=[{q:0,p:new V3()},{q:0,p:new V3()}], field=chargeField(ch), balls=chargeBalls(root,2);
+    const pts=gridPts(range(-6,6,1.5),range(-4.5,4.5,1.5),range(-4.5,4.5,1.5));
+    const arr=new Arrows(pts.length,COL.E,0.028); root.add(arr.group);
+    const flow=new Flow(COL.E,{tube:0.017,opacity:.42,spacing:1.2,dot:.22}); root.add(flow.group);
+    const sheet=potentialSheet(16,12,240,180); root.add(sheet.mesh);
+    const probe=new THREE.Mesh(G_SPH,new THREE.MeshBasicMaterial({color:'#ffffff'})); probe.scale.setScalar(.11); root.add(probe);
+    const pa=new Arrows(1,COL.E,0.06); root.add(pa.group);
+    const pl=vlabel('E',COL.E,.55); root.add(pl);
+    const pt=label('probe',{sans:true,size:.32,color:'#aebccc'}); root.add(pt);
+    const e=new V3();
+    return {
+      rebuild(){
+        ch[0].q=P.q1*1e-9; ch[1].q=P.q2*1e-9; ch[0].p.set(-P.d/2,0,0); ch[1].p.set(P.d/2,0,0); balls(ch);
+        arr.group.visible=P.grid;
+        if (P.grid){ pts.forEach((p,i)=>{ if (ch.some(c=>c.q&&p.distanceTo(c.p)<.7)){arr.hide(i);return;} field(p,e); const mg=e.length(); arr.set(i,p,e,1.25*sat(mg,4e4),.3+.7*sat(mg,4e4)); }); arr.flush(); }
+        flow.group.visible=P.lines; if (P.lines) flow.set(chargeLines(ch,field));
+        sheet.mesh.visible=P.pot;
+        if (P.pot) sheet.draw((x,y)=>{ let f=0; for (const c of ch){ const r=Math.max(Math.hypot(x-c.p.x,y-c.p.y),0.15)*0.01; f+=KE*c.q/r; } return f; }, 1800, 250);
+        probe.position.set(P.px,P.py,0); field(probe.position,e); const mg=e.length(), L=2.2*sat(mg,4e4);
+        pa.set(0,probe.position,e,L,1); pa.flush();
+        pl.position.copy(probe.position).addScaledVector(e.clone().normalize(),L+.45); pt.position.copy(probe.position).add(new V3(0,-.45,0));
+      },
+      update(t,dt){ flow.update(dt); },
+      readout(){
+        field(probe.position,e); let ph=0; ch.forEach(c=>{ if(c.q) ph+=KE*c.q/(Math.max(probe.position.distanceTo(c.p),1e-3)*.01); });
+        return [[`${m.E} at probe`,vecSI(e,'V/m')],['|<b>E</b>| at probe',si(e.length(),'V/m')],['<i>φ</i> at probe',si(ph,'V')],
+          ['Force on +1 nC test charge',si(e.length()*1e-9,'N')],['Net charge <i>q</i>₁ + <i>q</i>₂',si(ch[0].q+ch[1].q,'C')],['Field lines drawn','∝ |<i>q</i>| (≈3 per nC)']];
+      }
+    };
+  }
+},
+
+/* ---------------------------------------------------------------- 2 */
+{ key:'divcurl', short:'∇· and ∇×', title:'Divergence and curl, seen directly', sub:'The two things the del operator ∇ measures in a vector field: outflow and circulation.',
+  cam:[7,5.5,9.5], axis:4, unit:'', legend:['F0','E','fin'],
+  eq:[['Del operator', `∇ = (${fr('∂','∂<i>x</i>')}, ${fr('∂','∂<i>y</i>')}, ${fr('∂','∂<i>z</i>')})`],
+      ['Divergence', `∇·${m.Fg} = lim ${fr('1','<i>V</i>')}∯ ${m.Fg}·${m.da}`],
+      ['Curl', `(∇×${m.Fg})·${m.n} = lim ${fr('1','<i>A</i>')}∮ ${m.Fg}·${m.dl}`]],
+  params:[
+    {k:'type',l:'Vector field',type:'select',v:0,options:['Source  F = r','Sink  F = −r','Vortex  F = ŷ × r','Uniform  F = x̂','Shear  F = y x̂','Point source  F = r̂ / r²','Spiral  ½r + ŷ × r']},
+    {k:'s',l:'Field strength',min:0.2,max:2,step:0.05,v:1,u:'×'},
+    {k:'px',l:'Probe x',min:-2.5,max:2.5,step:0.05,v:1.5},
+    {k:'py',l:'Probe y',min:-1.5,max:1.5,step:0.05,v:0},
+    {k:'grid',l:'Arrow grid',type:'toggle',v:true},
+    {k:'tr',l:'Tracer particles',type:'toggle',v:true}],
+  explain:[
+    `A generic vector field ${m.Fg} fills the box (white arrows); tracer particles drift with it like dust in a fluid. The white wire cube is a small probe volume: arrows on its six faces show how much field flows <em>out</em> (orange) or <em>in</em> (lavender) through each face. The paddle wheel at the same spot spins if the field has local rotation.`,
+    `Nothing physical yet. This step builds the two tools that every Maxwell equation is written with. ∇ (“del” or “nabla”) is the operator (∂/∂<i>x</i>, ∂/∂<i>y</i>, ∂/∂<i>z</i>), unit 1/m. Applied with a dot it gives divergence; with a cross it gives curl.`,
+    `Two local numbers: ∇·${m.Fg} (a scalar, net outflow per unit volume) and ∇×${m.Fg} (a vector, circulation per unit area; its direction is the axis of rotation). The readout computes both numerically at the probe.`,
+    `Positive divergence: face arrows point outward, the point is a <em>source</em>. Negative: inward, a <em>sink</em>. The white curl arrow points along the paddle wheel’s axis by the right-hand rule: curl the fingers with the spin, the thumb gives ∇×${m.Fg}.`,
+    `∇·${m.Fg} = ∂F<sub>x</sub>/∂x + ∂F<sub>y</sub>/∂y + ∂F<sub>z</sub>/∂z. Gauss’s theorem ∭(∇·${m.Fg})d<i>V</i> = ∯${m.Fg}·${m.da} and Stokes’ theorem ∬(∇×${m.Fg})·${m.da} = ∮${m.Fg}·${m.dl} are what convert each differential Maxwell equation into its integral form. In Maxwell’s equations: ∇·${m.D} = <i>ρ</i><sub>f</sub> (charges are sources), ∇·${m.B} = 0 (no sources ever), ∇×${m.E} = −∂${m.B}/∂<i>t</i> and ∇×${m.H} = ${m.J}<sub>f</sub> + ∂${m.D}/∂<i>t</i> (what makes fields circulate).`,
+    `<b>Vortex</b>: divergence 0 but curl 2ŷ everywhere, so the wheel spins wherever you put it. <b>Shear</b>: all arrows parallel, yet curl ≠ 0 because the flow is faster on one side of the wheel. <b>Uniform</b>: zero div, zero curl. <b>Point source 1/r²</b>: divergence is zero everywhere except at the origin; this is exactly the Coulomb field of step 1. Move the probe into the origin to see the flux become large.`],
+  create({root,P}){
+    const FIELDS=[(p,o)=>o.copy(p),(p,o)=>o.copy(p).negate(),(p,o)=>o.set(p.z,0,-p.x),(p,o)=>o.set(1,0,0),(p,o)=>o.set(p.y,0,0),
+      (p,o)=>{const r=Math.max(p.length(),0.12); return o.copy(p).divideScalar(r*r*r);},(p,o)=>o.set(0.5*p.x+p.z,0.5*p.y,0.5*p.z-p.x)];
+    const F=(p,o)=>FIELDS[P.type](p,o).multiplyScalar(P.s);
+    const pts=gridPts(range(-3,3,1),range(-2,2,1),range(-3,3,1));
+    const arr=new Arrows(pts.length,COL.neutral,0.022); root.add(arr.group);
+    const NT=700, tr=pointsCloud(NT,COL.neutral,.11), tp=tr.geometry.attributes.position.array, age=new Float32Array(NT); root.add(tr);
+    const spawn=i=>{ tp[i*3]=rand(-3.4,3.4); tp[i*3+1]=rand(-2.4,2.4); tp[i*3+2]=rand(-3.4,3.4); age[i]=rand(0,3); };
+    for (let i=0;i<NT;i++) spawn(i);
+    const cube=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1,1,1)),new THREE.LineBasicMaterial({color:'#ffffff'})); root.add(cube);
+    const faces=new Arrows(6,COL.E,0.03); root.add(faces.group);
+    const wheel=new THREE.Group(), spin=new THREE.Group(); wheel.add(spin); root.add(wheel);
+    const wm=new THREE.MeshStandardMaterial({color:'#cfd8e3',roughness:.4,metalness:.2});
+    spin.add(new THREE.Mesh(new THREE.CylinderGeometry(.025,.025,.9,8),wm));
+    for (let k=0;k<4;k++){ const bl=new THREE.Mesh(new THREE.BoxGeometry(.32,.42,.025),wm); const a=k*Math.PI/2; bl.position.set(.18*Math.cos(a),0,-.18*Math.sin(a)); bl.rotation.y=a; spin.add(bl); }
+    const ca=new Arrows(1,'#ffffff',0.04); root.add(ca.group); const cl=label('∇×F',{color:'#ffffff',size:.42}); root.add(cl);
+    const pr=new V3(), f=new V3(), dc={div:0,curl:new V3(),flux:0};
+    const NF=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].map(a=>new V3(...a));
+    function divcurl(p){
+      const h=1e-3, J=[]; const a=new V3(), b=new V3(), q=new V3();
+      for (let k=0;k<3;k++){ q.copy(p); q.setComponent(k,p.getComponent(k)+h); F(q,a); q.setComponent(k,p.getComponent(k)-h); F(q,b); J.push(a.clone().sub(b).divideScalar(2*h)); }
+      dc.div=J[0].x+J[1].y+J[2].z; dc.curl.set(J[1].z-J[2].y, J[2].x-J[0].z, J[0].y-J[1].x);
+    }
+    return {
+      rebuild(){
+        arr.group.visible=P.grid; tr.visible=P.tr;
+        pts.forEach((p,i)=>{ F(p,f); const mg=f.length(); arr.set(i,p,f,0.85*sat(mg,P.type===5?0.25:1.6),.35+.65*sat(mg,1.6)); }); arr.flush();
+        pr.set(P.px,P.py,0); cube.position.copy(pr); wheel.position.copy(pr); divcurl(pr);
+        let tot=0; const q=new V3();
+        NF.forEach((n,k)=>{ let fl=0; const u=new V3(n.y,n.z,n.x), v=new V3().crossVectors(n,u);
+          for (let a=-1;a<=1;a++) for (let b=-1;b<=1;b++){ q.copy(pr).addScaledVector(n,.5).addScaledVector(u,a/3).addScaledVector(v,b/3); F(q,f); fl+=f.dot(n)/9; }
+          tot+=fl; const c=pr.clone().addScaledVector(n,.5); const dir=n.clone().multiplyScalar(Math.sign(fl)||1); const L=.85*sat(fl,1.2);
+          if (fl>=0) faces.set(k,c,dir,L,1,null,COL.E); else faces.set(k,c.clone().addScaledVector(n,L),dir,L,1,null,COL.neg); });
+        faces.flush(); dc.flux=tot;
+        const cm=dc.curl.length();
+        if (cm>1e-6){ wheel.quaternion.setFromUnitVectors(UP,dc.curl.clone().normalize()); ca.set(0,pr,dc.curl,0.6+0.6*sat(cm,2),1); cl.visible=app.showLabels; cl.position.copy(pr).addScaledVector(dc.curl.clone().normalize(),1.5+.6*sat(cm,2)); }
+        else { wheel.quaternion.identity(); ca.hide(0); cl.visible=false; }
+        ca.flush();
+      },
+      update(t,dt){
+        spin.rotation.y += dt*0.5*dc.curl.length()*1.6;
+        if (!P.tr) return; const q=new V3();
+        for (let i=0;i<NT;i++){ q.set(tp[i*3],tp[i*3+1],tp[i*3+2]); F(q,f); const mg=f.length(); q.addScaledVector(f, dt*0.55/Math.max(1,mg/3)); age[i]+=dt;
+          if (Math.abs(q.x)>3.6||Math.abs(q.y)>2.6||Math.abs(q.z)>3.6||age[i]>4.5||q.length()<0.1) spawn(i); else { tp[i*3]=q.x; tp[i*3+1]=q.y; tp[i*3+2]=q.z; } }
+        tr.geometry.attributes.position.needsUpdate=true;
+      },
+      readout(){ return [['Probe position',`(${fx(P.px)}, ${fx(P.py)}, 0)`],['Divergence ∇·<b>F</b>',fx(dc.div,3)],['Net flux out of cube ∯<b>F</b>·d<b>a</b> / V',fx(dc.flux,3)],
+        ['Curl ∇×<b>F</b>',`(${fx(dc.curl.x)}, ${fx(dc.curl.y)}, ${fx(dc.curl.z)})`],['|∇×<b>F</b>|',fx(dc.curl.length(),3)],['Paddle-wheel rate = ½|∇×<b>F</b>|',fx(dc.curl.length()/2,3)+' rad/(unit time)']]; }
+    };
+  }
+},
+
+/* ---------------------------------------------------------------- 3 */
+{ key:'gaussE', short:'Gauss (E)', title:'Gauss’s law for electricity', sub:'Flux through a closed surface counts the charge inside. Free charge, D and E.',
+  cam:[3,8,19], axis:8, unit:'cm', legend:['E','fin','pos','neg','D'],
+  eq:[['Differential', EQ.gaussE.diff+'&nbsp;&nbsp; | &nbsp;'+EQ.gaussE.vdiff],['Integral', EQ.gaussE.int],['Vacuum', `${EQ.gaussE.vint},&nbsp; ${m.D} = ${e0}${m.E}`]],
+  params:[
+    {k:'q1',l:'Charge q₁',min:-10,max:10,step:0.5,v:5,u:'nC'},
+    {k:'off',l:'q₁ position x (move it out!)',min:0,max:9,step:0.1,v:0,u:'cm'},
+    {k:'q2',l:'Charge q₂ (fixed, outside)',min:-10,max:10,step:0.5,v:-3,u:'nC'},
+    {k:'R',l:'Surface size R',min:2,max:6.5,step:0.1,v:4,u:'cm'},
+    {k:'shape',l:'Gaussian surface',type:'seg',v:0,options:['Sphere','Cube']},
+    {k:'lines',l:'Field lines',type:'toggle',v:true}],
+  explain:[
+    `A closed, imaginary Gaussian surface encloses a region of space. Its skin is coloured by the normal component ${m.E}·${m.n}: orange where field leaves, lavender where it enters. Arrows show that normal component at sample points. The readout adds up the total outward flux <i>Φ</i><sub>E</sub> = ∯${m.E}·${m.da} numerically over the whole surface.`,
+    `The charge enclosed. Each field line that starts on a charge inside must pierce the surface on its way out. A line from a charge outside enters and leaves again, so it adds nothing to the net count.`,
+    `Electric flux <i>Φ</i><sub>E</sub> (unit V·m). Multiplying by ${e0} gives the displacement flux ∯${m.D}·${m.da}, measured in coulombs: it literally <em>is</em> the enclosed free charge.`,
+    `Flux is counted positive along the outward normal ${m.n} (d${m.da} = ${m.n} d<i>a</i>). A positive charge inside gives net outflow, a negative one net inflow.`,
+    `Differential: ∇·${m.D} = <i>ρ</i><sub>f</sub>, i.e. the free charge density is the divergence (source strength) of ${m.D}. In vacuum ${m.D} = ${e0}${m.E}, giving ∇·${m.E} = <i>ρ</i>/${e0}. Integral (via Gauss’s theorem): ∯${m.D}·${m.da} = <i>Q</i><sub>f,enc</sub>. Why two fields? In matter, the total charge is <i>ρ</i> = <i>ρ</i><sub>f</sub> + <i>ρ</i><sub>b</sub>; ${m.E} responds to all of it (∇·${m.E} = <i>ρ</i>/${e0}), while ${m.D} = ${e0}${m.E} + ${m.P} is built so that only the free charge you control appears (see step 8).`,
+    `Change the size or switch sphere ↔ cube: the colours rearrange but the flux stays exactly <i>q</i>₁/${e0}. Slide q₁ past the surface: the flux drops to ≈ 0 although ${m.E} on the surface is clearly not zero. q₂ outside never changes the total. Flip the sign of q₁ and the flux flips.`],
+  create({root,P}){
+    const ch=[{q:0,p:new V3()},{q:0,p:new V3(-8.5,2,0)}], field=chargeField(ch), balls=chargeBalls(root,2);
+    const flow=new Flow(COL.E,{tube:0.016,opacity:.38,spacing:1.3,dot:.2}); root.add(flow.group);
+    let surf=null; const surfMat=new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:.32,depthWrite:false,side:THREE.DoubleSide});
+    const wire=new THREE.Group(); root.add(wire);
+    const fa=new Arrows(170,COL.E,0.03); root.add(fa.group);
+    const out={flux:0,qenc:0,warn:''}; let lastShape=-1,lastR=-1;
+    const sl=label('closed surface ∂V',{sans:true,size:.38,color:'#aebccc'}); root.add(sl);
+    return {
+      rebuild(k){
+        ch[0].q=P.q1*1e-9; ch[0].p.set(P.off,0,0); ch[1].q=P.q2*1e-9; balls(ch);
+        const R=P.R, sph=P.shape===0;
+        if (lastShape!==P.shape || lastR!==R){
+          if (surf){ root.remove(surf); surf.geometry.dispose(); }
+          surf=new THREE.Mesh(sph? new THREE.SphereGeometry(R,64,40) : new THREE.BoxGeometry(2*R,2*R,2*R,20,20,20), surfMat); root.add(surf);
+          clearGroup(wire); wire.add(new THREE.LineSegments(new THREE.EdgesGeometry(sph?new THREE.IcosahedronGeometry(R,1):new THREE.BoxGeometry(2*R,2*R,2*R)),new THREE.LineBasicMaterial({color:'#5d6d80',transparent:true,opacity:.5})));
+          lastShape=P.shape; lastR=R;
+        }
+        surf.updateMatrixWorld(); colorSurface(surf, field, COL.E, COL.neg, 2e4);
+        // quadrature
+        const f=new V3(); let flux=0, samples=[];
+        if (sph){ const N=2400, dA=4*Math.PI*R*R/N*1e-4; fib(N).forEach(n=>{ const p=n.clone().multiplyScalar(R); field(p,f); flux+=f.dot(n)*dA; }); samples=fib(160).map(n=>[n.clone().multiplyScalar(R),n]); }
+        else { const M=26, h=2*R/M, dA=h*h*1e-4; [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].forEach(a=>{ const n=new V3(...a), u=new V3(a[1],a[2],a[0]), v=new V3().crossVectors(n,u);
+            for (let i=0;i<M;i++) for (let j=0;j<M;j++){ const p=n.clone().multiplyScalar(R).addScaledVector(u,-R+(i+.5)*h).addScaledVector(v,-R+(j+.5)*h); field(p,f); flux+=f.dot(n)*dA; }
+            for (let i=0;i<5;i++) for (let j=0;j<5;j++) samples.push([n.clone().multiplyScalar(R).addScaledVector(u,-R+(i+.5)*2*R/5).addScaledVector(v,-R+(j+.5)*2*R/5),n]); }); }
+        samples.forEach(([p,n],i)=>{ field(p,f); const En=f.dot(n), L=1.3*sat(En,2.5e4); if (En>=0) fa.set(i,p,n,L,1,null,COL.E); else fa.set(i,p.clone().addScaledVector(n,L),n.clone().negate(),L,1,null,COL.neg); });
+        for (let i=samples.length;i<170;i++) fa.hide(i); fa.flush();
+        const inside=p=> sph? p.length()<R : Math.max(Math.abs(p.x),Math.abs(p.y),Math.abs(p.z))<R;
+        const dist=p=> sph? Math.abs(p.length()-R) : Math.abs(Math.max(Math.abs(p.x),Math.abs(p.y),Math.abs(p.z))-R);
+        out.flux=flux; out.qenc=ch.reduce((s,c)=>s+(inside(c.p)?c.q:0),0);
+        out.warn = ch.some(c=>c.q&&dist(c.p)<0.25) ? 'A charge sits on the surface: the flux is not defined there. Move it.' : '';
+        sl.position.set(R*0.72,R*0.72+0.5,0);
+        if (P.lines) flow.set(chargeLines(ch,field,2.4,14)); flow.group.visible=P.lines;
+      },
+      update(t,dt){ flow.update(dt); },
+      readout(){ return [['<i>Q</i><sub>enc</sub> (charge inside)',si(out.qenc,'C')],['<i>Φ</i><sub>E</sub> = ∯<b>E</b>·d<b>a</b> (numerical)',si(out.flux,'V·m')],
+        ['<i>Q</i><sub>enc</sub> / <i>ε</i><sub>0</sub>',si(out.qenc/EPS0,'V·m')],['∯<b>D</b>·d<b>a</b> = <i>ε</i><sub>0</sub><i>Φ</i><sub>E</sub>',si(out.flux*EPS0,'C')],
+        ['<i>Q</i><sub>f,enc</sub> (all charge here is free)',si(out.qenc,'C')],[out.warn?'⚠':'Status',out.warn||(Math.abs(out.qenc)>0?'flux = Q/ε₀ ✓':'nothing inside → flux ≈ 0 ✓')]]; }
+    };
+  }
+},
+
+/* ---------------------------------------------------------------- 4 */
+{ key:'ampere', short:'Current → B', title:'Electric current makes a magnetic field', sub:'Ampère’s law for a straight wire: B and H circle the current, A runs along it.',
+  cam:[11,6,12], axis:8, unit:'cm', legend:['J','B','H','A'],
+  eq:[['Differential', `∇×${m.H} = ${m.J}<sub>f</sub> &nbsp;(static)`],['Integral', `∮ ${m.B}·${m.dl} = ${u0}<i>I</i><sub>enc</sub>,&nbsp; ∮ ${m.H}·${m.dl} = <i>I</i><sub>f,enc</sub>`],['Straight wire', `<i>B</i> = ${fr(u0+'<i>I</i>','2π<i>ρ</i>')},&nbsp; ${m.B} = ∇×${m.A}`]],
+  params:[
+    {k:'I',l:'Current I',min:-20,max:20,step:0.5,v:10,u:'A'},
+    {k:'r',l:'Amperian loop radius',min:1,max:7,step:0.1,v:3,u:'cm'},
+    {k:'show',l:'Arrows show',type:'seg',v:0,options:['B (tesla)','H (A/m)']},
+    {k:'A',l:'Vector potential A',type:'toggle',v:false}],
+  explain:[
+    `A long straight wire along the y-axis carries a steady current <i>I</i>. The red dots are the moving charge carriers (drawn as positive charge moving with the conventional current). Around the wire, the magnetic field forms closed circles; the dots on the blue rings run in the direction of ${m.B}. The white ring is an Amperian loop C.`,
+    `Moving charge. The current density ${m.J} (A/m²) is charge per area per time flowing through the wire; integrated over the cross-section it gives the current <i>I</i>.`,
+    `A magnetic flux density ${m.B} (tesla, T) and the magnetic field strength ${m.H} (A/m). In vacuum they describe the same field in different units, ${m.B} = ${u0}${m.H}; they differ only inside magnetic matter (step 9). Optionally: the magnetic vector potential ${m.A} (T·m), whose curl is ${m.B}.`,
+    `Right-hand rule: thumb along the current, fingers curl along ${m.B}. The field is purely azimuthal (along ${m.n}<sub>φ</sub>), never radial and never along the wire. ${m.A} points along the current and is largest near the wire.`,
+    `∇×${m.H} = ${m.J}<sub>f</sub>: current density is the “curl source” of ${m.H}. Integrated with Stokes’ theorem: ∮${m.H}·${m.dl} = <i>I</i><sub>f,enc</sub>, or ∮${m.B}·${m.dl} = ${u0}<i>I</i> in vacuum. By symmetry <i>B</i> is constant on a circle, so <i>B</i>·2π<i>ρ</i> = ${u0}<i>I</i> → <i>B</i> = ${u0}<i>I</i>/(2π<i>ρ</i>). ${u0} = 1.2566 × 10⁻⁶ N/A² sets the strength of magnetic effects. (Time-dependent fields need one more term: step 7.)`,
+    `Make the loop bigger: <i>B</i> on it drops as 1/<i>ρ</i>, but the loop gets longer as <i>ρ</i>, so ∮${m.B}·${m.dl} stays ${u0}<i>I</i>. Reverse the current: every ring reverses. Switch the arrows to ${m.H} to see it is the same pattern in A/m. Turn on ${m.A}: it follows the current, and its curl reproduces ${m.B}.`],
+  create({root,P}){
+    const RAD=[1.5,3,4.5,6], YS=[-4.5,0,4.5], NA=16;
+    const pos=ringPts(RAD,YS,NA,.5), arr=new Arrows(pos.length,COL.B,0.035); root.add(arr.group);
+    const flow=new Flow(COL.B,{tube:0.014,opacity:.35,spacing:1.0,dot:.2,speed:1}); root.add(flow.group);
+    const polys=[], ks=[]; for (const y of YS) for (const rho of RAD){ polys.push(circlePoly(rho,y)); ks.push(1.5/rho); } flow.set(polys,ks);
+    const wire=new THREE.Mesh(new THREE.CylinderGeometry(.16,.16,16,24,1,true),glass('#c7cdd6',.18)); root.add(wire);
+    const NC=90, car=pointsCloud(NC,COL.J,.22), cp=car.geometry.attributes.position.array; root.add(car);
+    for (let i=0;i<NC;i++){ const a=rand(0,TAU), r=Math.sqrt(Math.random())*.12; cp[i*3]=r*Math.cos(a); cp[i*3+1]=rand(-8,8); cp[i*3+2]=r*Math.sin(a); }
+    const ia=new Arrows(1,COL.J,0.06); root.add(ia.group); const il=label('I',{color:COL.J,size:.6}); root.add(il);
+    const loop=new THREE.Mesh(new THREE.TorusGeometry(1,0.03,8,120),new THREE.MeshBasicMaterial({color:'#ffffff'})); loop.rotation.x=Math.PI/2; root.add(loop);
+    const dla=new Arrows(12,'#ffffff',0.022); root.add(dla.group); const cl=label('C',{color:'#ffffff',size:.5}); root.add(cl);
+    const apos=[]; for (const rho of [0.8,1.6,2.4,3.2,4,4.8,5.6,6.4,7.2]) for (const t of [0,TAU/3,2*TAU/3]) apos.push(new V3(rho*Math.cos(t+.6),-6.5,-rho*Math.sin(t+.6)));
+    const aa=new Arrows(apos.length,COL.A,0.035); root.add(aa.group); const al=vlabel('A',COL.A,.55); root.add(al);
+    const ph=new V3(), RHO0=8;
+    const Bmag=(rho,I)=> MU0*I/(TAU*rho*0.01);
+    const out={B:0,line:0};
+    return {
+      rebuild(){
+        const I=P.I, showH=P.show===1, col=showH?COL.H:COL.B; arr.setColor(col); flow.mat.color.set(col); flow.pmat.color.set(col);
+        pos.forEach((p,i)=>{ const rho=Math.hypot(p.x,p.z), B=Bmag(rho,I); phiHat(p,ph).multiplyScalar(Math.sign(I)||1); arr.set(i,p,ph,1.4*sat(B,5e-5),.35+.65*sat(B,5e-5)); }); arr.flush();
+        ia.set(0,new V3(0,5.6,0),new V3(0,Math.sign(I)||1,0),1.6,1); ia.flush(); il.position.set(.5,7.6,0);
+        const nb=vlabel(showH?'H':'B',col,.6); nb.position.set(0,1.0,-3.2); root.add(nb); this._bl&&(root.remove(this._bl),disposeTree(this._bl)); this._bl=nb;
+        loop.scale.setScalar(P.r); loop.position.y=0;
+        for (let i=0;i<12;i++){ const t=TAU*(i+.25)/12, p=new V3(P.r*Math.cos(t),0,-P.r*Math.sin(t)); phiHat(p,ph); dla.set(i,p.clone().addScaledVector(ph,-.25),ph,.5,1); } dla.flush();
+        cl.position.set(P.r*0.75+.35,.45,P.r*0.75);
+        aa.group.visible=al.visible=P.A&&app.showLabels; aa.group.visible=P.A;
+        apos.forEach((p,i)=>{ const rho=Math.hypot(p.x,p.z), A=MU0*I/TAU*Math.log(RHO0/rho); aa.set(i,p,new V3(0,Math.sign(A)||1,0),1.8*sat(A,4e-6),1); }); aa.flush(); al.position.set(1.2,-3.6,0);
+        // numerical line integral on the loop
+        let s=0; const N=180; for (let i=0;i<N;i++){ const t=TAU*(i+.5)/N, p=new V3(P.r*Math.cos(t),0,-P.r*Math.sin(t)); const B=Bmag(P.r,I); s+=B*(TAU*P.r*0.01/N); }
+        out.B=Bmag(P.r,I); out.line=s;
+      },
+      update(t,dt){
+        flow.update(dt, Math.sign(P.I)*Math.min(2,Math.abs(P.I)/8));
+        const v=dt*1.6*P.I/10; for (let i=0;i<NC;i++){ let y=cp[i*3+1]+v; if (y>8) y-=16; if (y<-8) y+=16; cp[i*3+1]=y; } car.geometry.attributes.position.needsUpdate=true;
+      },
+      readout(){ const I=P.I, a=1e-3, rho=P.r*0.01; return [['Current <i>I</i>',si(I,'A')],[`${m.J} in wire (radius 1 mm)`,si(I/(Math.PI*a*a),'A/m²')],
+        ['<i>B</i> on loop',si(out.B,'T')],['<i>H</i> on loop',si(out.B/MU0,'A/m')],['∮<b>B</b>·d<b>l</b> (numerical)',si(out.line,'T·m')],['<i>μ</i><sub>0</sub><i>I</i>',si(MU0*I,'T·m')],
+        ['∮<b>H</b>·d<b>l</b> = <i>I</i>',si(out.line/MU0,'A')],['<i>A</i>(<i>ρ</i>) relative to <i>ρ</i>₀ = 8 cm',si(MU0*I/TAU*Math.log(0.08/rho),'T·m')]]; }
+    };
+  }
+},
+
+/* ---------------------------------------------------------------- 5 */
+{ key:'gaussB', short:'Gauss (B)', title:'Gauss’s law for magnetism: lines close', sub:'A current loop is a magnetic dipole. Its B-lines have no start and no end, so net flux through any closed surface is zero.',
+  cam:[2,5,17], axis:7, unit:'cm', legend:['B','J','M'],
+  eq:[['Differential', EQ.gaussB.diff],['Integral', EQ.gaussB.int],['Dipole moment', `<b class="vec" style="color:var(--cM)">m</b> = <i>I</i>π<i>a</i>²${m.n}`]],
+  params:[
+    {k:'I',l:'Loop current I',min:-20,max:20,step:0.5,v:10,u:'A'},
+    {k:'R',l:'Closed surface radius',min:1,max:7,step:0.1,v:3,u:'cm'},
+    {k:'cx',l:'Surface centre x',min:-6,max:6,step:0.1,v:1.8,u:'cm'},
+    {k:'cy',l:'Surface centre y',min:-5,max:5,step:0.1,v:1.5,u:'cm'}],
+  explain:[
+    `A circular loop (radius 2.2 cm) in the xz-plane carries current <i>I</i>. Its magnetic field lines thread through the loop and come back around the outside: every line is a closed curve. The translucent sphere is a closed surface; its skin is blue where ${m.B} exits and purple where it enters.`,
+    `Currents (and, in matter, electron spin) are the only sources of ${m.B}. A magnetic field has no point “charges” to start or end on: no magnetic monopole has ever been observed.`,
+    `Magnetic flux <i>Φ</i><sub>B</sub> = ∬${m.B}·${m.da}, unit weber (Wb = T·m²). Through any closed surface, outgoing and incoming flux cancel exactly. The loop also has a magnetic dipole moment <b style="color:var(--cM)">m</b> = <i>I</i>·π<i>a</i>² (A·m²).`,
+    `Inside the loop ${m.B} points along <b style="color:var(--cM)">m</b> (right-hand rule: fingers along the current, thumb along <b style="color:var(--cM)">m</b>); outside it returns in the opposite direction. Close to the wire the lines are small circles around the wire, like step 4.`,
+    `∇·${m.B} = 0 everywhere: no point is a source or sink of ${m.B}. With Gauss’s theorem, ∯${m.B}·${m.da} = 0 for every closed surface, whatever its shape or position. This is why field lines must close (or run off to infinity). Careful: ${m.H} <em>can</em> have divergence inside magnetised matter (∇·${m.H} = −∇·${m.M}); ${m.B} never does.`,
+    `Move or resize the sphere: let it cut through the wire, swallow the whole loop, or sit off to one side. Φ<sub>out</sub> and Φ<sub>in</sub> change a lot, but the net is always ≈ 0 (the small remainder is numerical sampling error, shown as a percentage). Doubling <i>I</i> doubles every flux and leaves the line pattern unchanged.`],
+  create({root,P}){
+    const a=2.2, NS=72, segP=[], segD=[];
+    for (let j=0;j<NS;j++){ const t0=TAU*j/NS, t1=TAU*(j+1)/NS; const p0=new V3(a*Math.cos(t0),0,-a*Math.sin(t0)), p1=new V3(a*Math.cos(t1),0,-a*Math.sin(t1)); segP.push(p0.clone().add(p1).multiplyScalar(.5)); segD.push(p1.clone().sub(p0)); }
+    const r=new V3(), c=new V3();
+    function Bunit(p,out){ out.set(0,0,0); for (let j=0;j<NS;j++){ r.subVectors(p,segP[j]); const r2=r.lengthSq(); if (r2<1e-6) continue; c.crossVectors(segD[j],r); out.addScaledVector(c,1e-5/(r2*Math.sqrt(r2))); } return out; } // T per A
+    // field lines (shape independent of |I|)
+    const polys=[], h=0.05;
+    const seeds=[new V3(0,0,0)]; for (const rho of [0.6,1.2,1.7,2.0,2.5]) for (let k=0;k<6;k++){ const t=TAU*(k+.5)/6; seeds.push(new V3(rho*Math.cos(t),0,-rho*Math.sin(t))); }
+    for (const s of seeds){
+      const fw=[s.clone()], p=s.clone(), k1=new V3(), k2=new V3(), tt=new V3(); let closed=false, esc=false;
+      for (let i=0;i<3200;i++){ Bunit(p,k1); k1.normalize().multiplyScalar(h); tt.copy(p).addScaledVector(k1,.5); Bunit(tt,k2); k2.normalize().multiplyScalar(h); p.add(k2); fw.push(p.clone());
+        if (i>40 && p.distanceTo(s)<h*1.6){ closed=true; fw.push(s.clone()); break; } if (p.length()>14){ esc=true; break; } }
+      let poly=fw; if (esc){ const bk=trace(Bunit,s,-1,{h,max:3200,stop:q=>q.length()>14}); poly=bk.reverse().concat(fw.slice(1)); }
+      if (closed) poly.closed=true; polys.push(poly);
+    }
+    const flow=new Flow(COL.B,{tube:0.018,opacity:.45,spacing:1.0,dot:.21,speed:1.3}); root.add(flow.group); flow.set(polys);
+    const ring=mkMesh(new THREE.TorusGeometry(a,0.07,12,120),{color:COL.copper,metalness:.6,roughness:.35}); ring.rotation.x=Math.PI/2; root.add(ring);
+    const NC=40, car=pointsCloud(NC,COL.J,.24), cp=car.geometry.attributes.position.array; root.add(car); let ang=0;
+    const ma=new Arrows(1,COL.M,0.07); root.add(ma.group); const ml=label('m',{color:COL.M,size:.55}); root.add(ml);
+    const sMat=new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:.34,depthWrite:false,side:THREE.DoubleSide});
+    let surf=null, lastR=-1; const fa=new Arrows(140,COL.B,0.028); root.add(fa.group);
+    const out={o:0,i:0}; const Il=label('I',{color:COL.J,size:.5}); root.add(Il);
+    return {
+      rebuild(){
+        const I=P.I;
+        if (lastR!==P.R){ if (surf){ root.remove(surf); surf.geometry.dispose(); } surf=new THREE.Mesh(new THREE.SphereGeometry(P.R,64,40),sMat); root.add(surf); lastR=P.R; }
+        surf.position.set(P.cx,P.cy,0); surf.updateMatrixWorld();
+        const BI=(p,o)=>Bunit(p,o).multiplyScalar(I);
+        colorSurface(surf,BI,COL.B,'#a46bff',3e-5);
+        const f=new V3(); let po=0, pi=0; const N=3000, dA=4*Math.PI*P.R*P.R/N*1e-4, cen=surf.position;
+        fib(N).forEach(n=>{ const p=n.clone().multiplyScalar(P.R).add(cen); BI(p,f); const fl=f.dot(n)*dA; if (fl>0) po+=fl; else pi+=fl; });
+        out.o=po; out.i=pi;
+        fib(140).forEach((n,i)=>{ const p=n.clone().multiplyScalar(P.R).add(cen); BI(p,f); const Bn=f.dot(n), L=1.1*sat(Bn,6e-5); if (Bn>=0) fa.set(i,p,n,L,1,null,COL.B); else fa.set(i,p.clone().addScaledVector(n,L),n.clone().negate(),L,1,null,'#a46bff'); }); fa.flush();
+        ma.set(0,new V3(0,-0.9,0),new V3(0,Math.sign(I)||1,0),1.8,1); ma.flush(); ml.position.set(.45,Math.sign(I)>=0?1.2:-1.2,0);
+        Il.position.set(a+.5,.5,0);
+      },
+      update(t,dt){
+        flow.update(dt,Math.sign(P.I)*Math.min(2,Math.abs(P.I)/8)); ang+=dt*Math.sign(P.I)*Math.min(2,Math.abs(P.I)/6)*0.8;
+        for (let i=0;i<NC;i++){ const t=ang+TAU*i/NC; cp[i*3]=a*Math.cos(t); cp[i*3+1]=0; cp[i*3+2]=-a*Math.sin(t); } car.geometry.attributes.position.needsUpdate=true;
+      },
+      readout(){ const net=out.o+out.i; return [['Φ<sub>out</sub> (outward part)',si(out.o,'Wb')],['Φ<sub>in</sub> (inward part)',si(out.i,'Wb')],['Net ∯<b>B</b>·d<b>a</b>',si(net,'Wb')],
+        ['Net / Φ<sub>out</sub> (sampling error)',(out.o?fx(100*net/out.o,2):'0.00')+' %'],['Dipole moment <i>m</i> = <i>I</i>π<i>a</i>²',si(P.I*Math.PI*0.022*0.022,'A·m²')],['<i>B</i> at loop centre = <i>μ</i><sub>0</sub><i>I</i>/2<i>a</i>',si(MU0*P.I/(2*0.022),'T')]]; }
+    };
+  }
+},
+
+/* ---------------------------------------------------------------- 6 */
+{ key:'faraday', short:'Faraday', title:'Faraday’s law: changing B makes a curling E', sub:'An oscillating magnetic field induces a circulating electric field and an EMF in a loop.',
+  cam:[10,7.5,11], axis:7, unit:'cm', legend:['B','E','J'],
+  eq:[['Differential', EQ.faraday.diff],['Integral', EQ.faraday.int],['EMF', `ℰ = ∮${m.E}·${m.dl} = −${fr('d<i>Φ</i><sub>B</sub>','d<i>t</i>')}`]],
+  chart:[['B(t)',COL.B],['EMF ℰ(t)',COL.E]],
+  params:[
+    {k:'B0',l:'Peak field B₀',min:10,max:500,step:5,v:200,u:'mT'},
+    {k:'f',l:'Frequency f',min:0.1,max:1.5,step:0.05,v:0.4,u:'Hz'},
+    {k:'r',l:'Conducting loop radius',min:1,max:7,step:0.1,v:3,u:'cm'}],
+  explain:[
+    `Inside the transparent cylinder (radius <i>R</i> = 4 cm, think of the gap of an AC electromagnet) there is a uniform magnetic field ${m.B} along y whose strength oscillates: <i>B</i>(<i>t</i>) = <i>B</i>₀ sin ω<i>t</i>. Outside the cylinder ${m.B} = 0. Orange rings appear: an electric field circulating around the changing flux, even where ${m.B} itself is zero. A copper loop picks up this field as an EMF and current flows in it (red dots).`,
+    `The <em>rate of change</em> ∂${m.B}/∂<i>t</i>, not ${m.B} itself. No charges are involved in producing this ${m.E}.`,
+    `A non-conservative, curling electric field ${m.E} (V/m) and an electromotive force ℰ = ∮${m.E}·${m.dl} (volts) around any closed path. In a conductor that EMF drives an induced current.`,
+    `${m.E} circulates around the direction of ∂${m.B}/∂<i>t</i> in the <em>left-handed</em> sense, because of the minus sign. The induced current produces its own magnetic field that opposes the change in flux (Lenz’s law). Compare the dots on the loop with the blue arrows: when ${m.B} grows upward, the current flows so that its own field points down.`,
+    `∇×${m.E} = −∂${m.B}/∂<i>t</i>: the curl of ${m.E} at each point equals minus the local rate of change of ${m.B}. Integrated over a surface Σ bounded by a loop (Stokes): ∮${m.E}·${m.dl} = −d<i>Φ</i><sub>B</sub>/d<i>t</i>. Here inside the field region <i>E</i> = (<i>ρ</i>/2)|d<i>B</i>/d<i>t</i>| and outside <i>E</i> = (<i>R</i>²/2<i>ρ</i>)|d<i>B</i>/d<i>t</i>|. This induced ${m.E} cannot be written as −∇<i>φ</i>; in general ${m.E} = −∇<i>φ</i> − ∂${m.A}/∂<i>t</i>.`,
+    `Raise <i>f</i> or <i>B</i>₀: d<i>B</i>/d<i>t</i> grows and so do <i>E</i> and the EMF. Watch the chart: the EMF peaks when <i>B</i> crosses zero (fastest change) and is zero at the peaks of <i>B</i>, a 90° phase shift. Grow the loop beyond 4 cm: the enclosed flux stops increasing, so the EMF saturates even though the loop is longer.`],
+  create({root,P}){
+    const Rb=4;
+    const bpos=[]; for (const x of range(-3,3,1.5)) for (const z of range(-3,3,1.5)) if (Math.hypot(x,z)<=3.2) for (const y of [-3.4,0,3.4]) bpos.push(new V3(x,y,z));
+    const ba=new Arrows(bpos.length,COL.B,0.04); root.add(ba.group);
+    const RAD=[1.5,3,4.5,6], YS=[-2.2,2.2], epos=ringPts(RAD,YS,16,.5), ea=new Arrows(epos.length,COL.E,0.035); root.add(ea.group);
+    const flow=new Flow(COL.E,{tube:0.013,opacity:.3,spacing:1.0,dot:.2,speed:1.2}); root.add(flow.group);
+    const polys=[]; for (const y of YS) for (const rho of RAD) polys.push(circlePoly(rho,y)); flow.set(polys);
+    const cyl=new THREE.Mesh(new THREE.CylinderGeometry(Rb,Rb,10,48,1,true),glass('#3a8dff',.06)); root.add(cyl);
+    const caps=[5,-5].map(y=>{ const c=mkMesh(new THREE.CylinderGeometry(Rb,Rb,.3,48),{color:'#2a3443',metalness:.5}); c.position.y=y+Math.sign(y)*.15; root.add(c); return c; });
+    const loop=mkMesh(new THREE.TorusGeometry(1,0.06,10,140),{color:COL.copper,metalness:.6,roughness:.3}); loop.rotation.x=Math.PI/2; root.add(loop);
+    const NC=36, car=pointsCloud(NC,COL.J,.26), cp=car.geometry.attributes.position.array; root.add(car); let ang=0;
+    const bl=vlabel('B',COL.B,.6); bl.position.set(.5,5.9,.5); root.add(bl); const el=vlabel('E',COL.E,.6); el.position.set(6.2,2.9,0); root.add(el);
+    const tl=label('region of changing B (R = 4 cm)',{sans:true,size:.34,color:'#8fb5ff'}); tl.position.set(0,-5.8,Rb); root.add(tl);
+    const st={B:0,dB:0,Ephi:0}; const hist=History(); const ph=new V3();
+    const Ephi=(rho,dB)=>{ const r=rho*0.01, R=Rb*0.01; return rho<Rb? -r/2*dB : -R*R/(2*r)*dB; };
+    function draw(t){
+      const w=TAU*P.f, B0=P.B0*1e-3; st.B=B0*Math.sin(w*t); st.dB=B0*w*Math.cos(w*t);
+      const bm=st.B, refB=0.25;
+      bpos.forEach((p,i)=>{ ba.setC(i,p,new V3(0,Math.sign(bm)||1,0),2.6*sat(bm,refB),.35+.65*sat(bm,refB)); }); ba.flush();
+      const refE=Ephi(Rb,0.5*TAU*0.5);
+      epos.forEach((p,i)=>{ const rho=Math.hypot(p.x,p.z), E=Ephi(rho,st.dB); phiHat(p,ph).multiplyScalar(Math.sign(E)||1); ea.set(i,p.clone().addScaledVector(ph,-.35),ph,1.2*sat(E,Math.abs(refE)*.8),.35+.65*sat(E,Math.abs(refE))); }); ea.flush();
+      st.Ephi=Ephi(P.r,st.dB);
+      flow.lines.forEach((L,i)=>{ const rho=RAD[i%RAD.length]; L.k=Ephi(rho,st.dB)/Math.abs(refE); });
+    }
+    return {
+      rebuild(){ loop.scale.setScalar(P.r); draw(app.t); },
+      update(t,dt){ draw(t); flow.update(dt);
+        ang+=dt*Math.max(-3,Math.min(3,st.Ephi/Math.abs(Ephi(4,0.5*TAU*0.5))*1.4))/Math.max(P.r,1)*2;
+        for (let i=0;i<NC;i++){ const a=ang+TAU*i/NC; cp[i*3]=P.r*Math.cos(a); cp[i*3+1]=0; cp[i*3+2]=-P.r*Math.sin(a); } car.geometry.attributes.position.needsUpdate=true;
+        if (dt>0){ hist.acc+=dt; if (hist.acc>1/30){ hist.acc=0; const A=Math.PI*Math.pow(Math.min(P.r,Rb)*0.01,2); hist.push(t,st.B,-st.dB*A); } }
+      },
+      chart(){ return hist; },
+      readout(){ const A=Math.PI*Math.pow(Math.min(P.r,Rb)*0.01,2), emf=-st.dB*A; return [['<i>B</i>(<i>t</i>)',si(st.B,'T')],['d<i>B</i>/d<i>t</i>',si(st.dB,'T/s')],
+        ['Flux through loop <i>Φ</i><sub>B</sub>',si(st.B*A,'Wb')],['EMF ℰ = −d<i>Φ</i><sub>B</sub>/d<i>t</i>',si(emf,'V')],['<i>E</i><sub>φ</sub> on the loop',si(st.Ephi,'V/m')],
+        ['∮<b>E</b>·d<b>l</b> = 2π<i>r E</i><sub>φ</sub>',si(st.Ephi*TAU*P.r*0.01,'V')],['Peak EMF = <i>B</i>₀ω<i>A</i>',si(P.B0*1e-3*TAU*P.f*A,'V')]]; }
+    };
+  }
+},
+
+/* ---------------------------------------------------------------- 7 */
+{ key:'maxwellterm', short:'Ampère–Maxwell', title:'Changing D makes a magnetic field', sub:'Maxwell’s displacement current: a charging capacitor has B around its gap, where no charge flows.',
+  cam:[10,4,12], axis:8, unit:'cm', legend:['J','D','dD','B','pos','neg'],
+  eq:[['Differential', EQ.ampere.diff],['Integral', EQ.ampere.int],['Vacuum', EQ.ampere.vdiff]],
+  chart:[['Current I(t)',COL.J],['Charge Q(t)',COL.D]],
+  params:[
+    {k:'I0',l:'Peak current I₀',min:0.1,max:2,step:0.05,v:1,u:'mA'},
+    {k:'f',l:'Real frequency f (shown slowed)',min:2,max:40,step:1,v:10,u:'kHz'},
+    {k:'r',l:'Amperian loop radius',min:0.5,max:6,step:0.1,v:4,u:'cm'},
+    {k:'yl',l:'Loop height y',min:-6,max:6,step:0.1,v:-4,u:'cm'},
+    {k:'surf',l:'Surface bounded by the loop',type:'seg',v:0,options:['Flat disc','Bag (into the gap)']}],
+  explain:[
+    `An alternating current <i>I</i>(<i>t</i>) = <i>I</i>₀ cos ω<i>t</i> flows up the wire and charges a parallel-plate capacitor (plate radius 3 cm, gap 2 cm). Charge piles up on the plates but never crosses the gap. Yet blue magnetic rings circle the gap just as they circle the wire. Amber arrows: ${m.D} between the plates. Pale arrows: its rate of change ∂${m.D}/∂<i>t</i>.`,
+    `The changing electric displacement in the gap. Maxwell called ∂${m.D}/∂<i>t</i> the <em>displacement current density</em> (A/m²). Through the gap it carries exactly the same total as the wire: <i>I</i><sub>d</sub> = π<i>R</i>²·∂<i>D</i>/∂<i>t</i> = <i>I</i>.`,
+    `A circulating ${m.H} (and ${m.B} = ${u0}${m.H}) around the region where ${m.D} changes. Inside the gap, at <i>ρ</i> < <i>R</i>, <i>B</i> = ${u0}<i>Iρ</i>/(2π<i>R</i>²); outside, <i>B</i> = ${u0}<i>I</i>/(2π<i>ρ</i>), the same as around the wire.`,
+    `${m.B} circles ∂${m.D}/∂<i>t</i> by the right-hand rule, exactly as it circles ${m.J}. It is the change of ${m.D} that matters, not ${m.D} itself: when the capacitor is fully charged (D at its peak) the current and B are momentarily zero. The chart shows <i>Q</i> lagging <i>I</i> by 90°.`,
+    `∇×${m.H} = ${m.J}<sub>f</sub> + ∂${m.D}/∂<i>t</i>. Without the second term, Ampère’s law would give different answers for two surfaces with the same boundary loop: a flat disc crossed by the wire (current <i>I</i>) and a bag that passes through the gap (no current). With it, both give <i>I</i>. Taking the divergence of both sides (∇·∇× = 0) and using ∇·${m.D} = <i>ρ</i><sub>f</sub> gives charge conservation, ∂<i>ρ</i><sub>f</sub>/∂<i>t</i> + ∇·${m.J}<sub>f</sub> = 0. In vacuum: ∇×${m.B} = ${u0}${m.J} + ${u0}${e0}∂${m.E}/∂<i>t</i>, the term that makes light possible (step 10).`,
+    `Move the loop into the gap (y between −1 and +1): the free current through the flat disc becomes 0 and the displacement current takes over; ∮${m.B}·${m.dl} is unchanged. Switch to the bag surface with the loop around the wire: again the same total. A small loop inside the gap encloses only part of the displacement current, so <i>B</i> there grows linearly with <i>ρ</i>. Higher frequency: less charge per cycle (<i>Q</i>₀ = <i>I</i>₀/ω) but the same <i>B</i>.`],
+  create({root,P}){
+    const Rp=3, gap=1;
+    const plates=[-1,1].map(s=>{ const m_=mkMesh(new THREE.CylinderGeometry(Rp,Rp,.12,64),{color:'#9aa4b2',metalness:.7,roughness:.3}); m_.position.y=s*(gap+.06); root.add(m_); return m_; });
+    [[-8,-gap-.12],[gap+.12,8]].forEach(([a,b])=>{ const w=new THREE.Mesh(new THREE.CylinderGeometry(.1,.1,b-a,16),new THREE.MeshStandardMaterial({color:'#9aa4b2',metalness:.6,roughness:.4})); w.position.y=(a+b)/2; root.add(w); });
+    const NC=60, car=pointsCloud(NC,COL.J,.22), cp=car.geometry.attributes.position.array; root.add(car);
+    for (let i=0;i<NC;i++){ cp[i*3]=rand(-.05,.05); cp[i*3+2]=rand(-.05,.05); const y=rand(1.2,8); cp[i*3+1]=i%2?y:-y; }
+    const dpos=[]; for (const x of range(-2.4,2.4,1.2)) for (const z of range(-2.4,2.4,1.2)) if (Math.hypot(x,z)<=2.6) dpos.push(new V3(x,0,z));
+    const da=new Arrows(dpos.length,COL.D,0.05), dda=new Arrows(dpos.length,COL.dD,0.025,{opacity:.85}); root.add(da.group,dda.group);
+    const RAD=[1.5,3,4.5], YS=[-4.5,0,4.5], bpos=ringPts(RAD,YS,16,.5), ba=new Arrows(bpos.length,COL.B,0.035); root.add(ba.group);
+    const flow=new Flow(COL.B,{tube:0.013,opacity:.3,spacing:1,dot:.2}); root.add(flow.group);
+    const polys=[]; for (const y of YS) for (const rho of RAD) polys.push(circlePoly(rho,y)); flow.set(polys);
+    const loop=new THREE.Mesh(new THREE.TorusGeometry(1,.03,8,120),new THREE.MeshBasicMaterial({color:'#ffffff'})); loop.rotation.x=Math.PI/2; root.add(loop);
+    const surfG=new THREE.Group(); root.add(surfG); const sm=glass('#ffffff',.1);
+    const ql=[label('+Q',{sans:true,size:.4,color:COL.pos}),label('−Q',{sans:true,size:.4,color:COL.neg})]; ql[0].position.set(Rp+.6,-1.2,0); ql[1].position.set(Rp+.6,1.2,0); root.add(...ql);
+    const dl_=vlabel('D',COL.D,.55); dl_.position.set(.45,.2,2.6); root.add(dl_); const bl_=vlabel('B',COL.B,.55); bl_.position.set(0,.6,-4.7); root.add(bl_);
+    const st={I:0,Q:0,D:0,dD:0,If:0,Id:0,Bl:0,warn:''}; const hist=History(); const ph=new V3();
+    const A=Math.PI*(Rp*.01)**2;
+    function Bat(rho,y){ const r=rho*0.01; if (Math.abs(y)<gap){ return rho<Rp? MU0*st.I*r/(TAU*(Rp*.01)**2) : MU0*st.I/(TAU*r); } return MU0*st.I/(TAU*r); }
+    let lastSurf=-1, lastR=-1, lastY=null;
+    function surfaces(){
+      if (lastSurf===P.surf && lastR===P.r && lastY===P.yl) return; lastSurf=P.surf; lastR=P.r; lastY=P.yl; clearGroup(surfG);
+      const bag = P.surf===1 && Math.abs(P.yl)>gap;
+      if (!bag){ const d=new THREE.Mesh(new THREE.CircleGeometry(P.r,64),sm.clone()); d.rotation.x=-Math.PI/2; d.position.y=P.yl; surfG.add(d); }
+      else { const hgt=Math.abs(P.yl); const c=new THREE.Mesh(new THREE.CylinderGeometry(P.r,P.r,hgt,64,1,true),sm.clone()); c.position.y=P.yl/2; surfG.add(c); const d=new THREE.Mesh(new THREE.CircleGeometry(P.r,64),sm.clone()); d.rotation.x=-Math.PI/2; surfG.add(d); }
+    }
+    function draw(t){
+      const wv=TAU*0.5*P.f/10, w=TAU*P.f*1e3, I0=P.I0*1e-3, phs=wv*t;
+      st.I=I0*Math.cos(phs); st.Q=(I0/w)*Math.sin(phs); st.D=st.Q/A; st.dD=st.I/A;
+      const Dref=I0/w/A, dDref=I0/A;
+      dpos.forEach((p,i)=>{ da.setC(i,p,new V3(0,Math.sign(st.D)||1,0),1.85*Math.abs(st.D)/Dref,1);
+        dda.setC(i,p.clone().add(new V3(.32,0,0)),new V3(0,Math.sign(st.dD)||1,0),1.7*Math.abs(st.dD)/dDref,1); }); da.flush(); dda.flush();
+      bpos.forEach((p,i)=>{ const rho=Math.hypot(p.x,p.z), B=Bat(rho,p.y); phiHat(p,ph).multiplyScalar(Math.sign(B)||1); ba.set(i,p.clone().addScaledVector(ph,-.3),ph,1.3*sat(B,8e-9),.35+.65*sat(B,8e-9)); }); ba.flush();
+      flow.lines.forEach((L,i)=>{ const rho=RAD[i%3], y=YS[Math.floor(i/3)]; L.k=Bat(rho,y)/1.2e-8; });
+      const s=Math.min(1,Math.abs(st.Q)/(I0/w));
+      plates[0].material.emissive.set(st.Q>=0?COL.pos:COL.neg).multiplyScalar(.6*s); plates[1].material.emissive.set(st.Q>=0?COL.neg:COL.pos).multiplyScalar(.6*s);
+      // surface bookkeeping
+      const inGap=Math.abs(P.yl)<gap, bag=P.surf===1&&!inGap, frac=Math.min(P.r,Rp)**2/Rp**2;
+      if (!bag){ st.If = inGap?0:st.I; st.Id = inGap? st.I*frac : 0; } else { st.If=0; st.Id=st.I*frac; }
+      st.warn = (P.surf===1 && inGap) ? 'Loop is inside the gap: bag not needed, showing the flat disc.' : (bag && P.r<Rp ? 'Bag wall cuts the plate, where free charge flows radially; count it and the sum is again I.' : '');
+      st.Bl=Bat(P.r,P.yl);
+    }
+    return {
+      rebuild(){ loop.scale.setScalar(P.r); loop.position.y=P.yl; surfaces(); draw(app.t); },
+      update(t,dt){ draw(t); flow.update(dt);
+        const v=dt*2.2*st.I/(P.I0*1e-3+1e-12); for (let i=0;i<NC;i++){ let y=cp[i*3+1]+v; if (i%2){ if (y>8) y=1.2+(y-8); if (y<1.2) y=8-(1.2-y); } else { if (y>-1.2) y=-8+(y+1.2); if (y<-8) y=-1.2-(-8-y); } cp[i*3+1]=y; } car.geometry.attributes.position.needsUpdate=true;
+        if (dt>0){ hist.acc+=dt; if (hist.acc>1/30){ hist.acc=0; hist.push(t,st.I,st.Q); } }
+      },
+      chart(){ return hist; },
+      readout(){ const tot=st.If+st.Id; return [['<i>I</i>(<i>t</i>) in wire',si(st.I,'A')],['<i>Q</i>(<i>t</i>) on plate',si(st.Q,'C')],['<i>D</i> in gap',si(st.D,'C/m²')],['∂<i>D</i>/∂<i>t</i>',si(st.dD,'A/m²')],
+        ['<i>I</i><sub>f</sub> through surface',si(st.If,'A')],['<i>I</i><sub>d</sub> = d/d<i>t</i>∬<b>D</b>·d<b>a</b>',si(st.Id,'A')],['<i>I</i><sub>f</sub> + <i>I</i><sub>d</sub>',si(tot,'A')],
+        ['∮<b>H</b>·d<b>l</b> (from <i>B</i> on loop)',si(st.Bl/MU0*TAU*P.r*0.01,'A')],['Animation slowed by','20 000×'],
+        ...(st.warn?[['Note',`<span style="white-space:normal;font-family:var(--sans);color:var(--muted)">${st.warn}</span>`]]:[])]; }
+    };
+  }
+},
+
+/* ---------------------------------------------------------------- 8 */
+{ key:'dielectric', short:'Dielectric P', title:'Polarization in a dielectric: E, D and P', sub:'Atoms stretch into dipoles. Bound charge reduces E inside, while D follows the free charge only.',
+  cam:[9,4.5,12], axis:6, unit:'cm', legend:['E','D','P','pos','neg'],
+  eq:[['Displacement', `${m.D} = ${e0}${m.E} + ${m.P}`],['Gauss in matter', `∇·${m.D} = <i>ρ</i><sub>f</sub>,&nbsp; <i>ρ</i><sub>b</sub> = −∇·${m.P},&nbsp; <i>σ</i><sub>b</sub> = ${m.P}·${m.n}`],['Linear medium', `${m.P} = ${e0}<i>χ</i><sub>e</sub>${m.E},&nbsp; ${m.D} = <i>ε</i>${m.E} = <i>ε</i><sub>r</sub>${e0}${m.E}`]],
+  params:[
+    {k:'sf',l:'Free surface charge σ_f on plates',min:0,max:20,step:0.5,v:12,u:'µC/m²'},
+    {k:'er',l:'Relative permittivity ε_r',min:1,max:10,step:0.1,v:3},
+    {k:'sE',l:'Show ε₀E',type:'toggle',v:true},{k:'sD',l:'Show D',type:'toggle',v:true},{k:'sP',l:'Show P',type:'toggle',v:true}],
+  explain:[
+    `Two metal plates (y = ±4.2 cm) carry free surface charge +<i>σ</i><sub>f</sub> (bottom) and −<i>σ</i><sub>f</sub> (top). A dielectric slab fills the middle (|y| < 2 cm), with air gaps above and below. In each atom the electron cloud (lavender) shifts against the field while the nucleus (red) stays: every atom becomes a small dipole <b style="color:var(--cP)">p</b> (pink arrows). Where dipole ends are not cancelled by neighbours, at the slab faces, a layer of <em>bound</em> charge appears (dots on the faces).`,
+    `The applied field from the free charges pushes positive and negative parts of each atom in opposite directions. In polar materials it also rotates permanent molecular dipoles. Changing <i>σ</i><sub>f</sub> lets you watch the response build up (its delay is exaggerated here; real electronic polarization responds within femtoseconds).`,
+    `Polarization ${m.P} (C/m², dipole moment per unit volume), bound surface charge <i>σ</i><sub>b</sub> = ${m.P}·${m.n} (−<i>σ</i><sub>b</sub> on the top face, +<i>σ</i><sub>b</sub> on the bottom), and bound volume charge <i>ρ</i><sub>b</sub> = −∇·${m.P}, which is zero here because ${m.P} is uniform. A time-varying ${m.P} also gives a polarization current ${m.J}<sub>p</sub> = ∂${m.P}/∂<i>t</i>.`,
+    `All three vectors point up (+y) here. ${m.P} points from the − to the + end of each dipole. The bound charge on each slab face has the opposite sign to the free charge on the nearest plate, so it partly cancels the free charge’s field inside the slab.`,
+    `${m.D} = ${e0}${m.E} + ${m.P} is a bookkeeping field built so that ∇·${m.D} = <i>ρ</i><sub>f</sub>: only free charge is its source. So <i>D</i> = <i>σ</i><sub>f</sub> everywhere between the plates, inside and outside the slab (the amber arrows have equal length). ${m.E} responds to <em>all</em> charge, free and bound: ∇·${m.E} = (<i>ρ</i><sub>f</sub> + <i>ρ</i><sub>b</sub>)/${e0}. For a linear dielectric ${m.P} = ${e0}<i>χ</i><sub>e</sub>${m.E}, <i>ε</i><sub>r</sub> = 1 + <i>χ</i><sub>e</sub>, so <i>E</i><sub>inside</sub> = <i>σ</i><sub>f</sub>/(<i>ε</i><sub>r</sub>${e0}). All arrows are drawn in the same unit (C/m²), so you can see ${e0}${m.E} + ${m.P} = ${m.D} add up inside the slab.`,
+    `Raise <i>ε</i><sub>r</sub>: ${m.P} grows, the bound charge grows, ${e0}${m.E} inside shrinks, ${m.D} does not change. At <i>ε</i><sub>r</sub> = 1 the slab is vacuum: no dipoles, ${e0}${m.E} = ${m.D}. Change <i>σ</i><sub>f</sub> quickly: ${m.D} jumps at once, ${m.P} lags, so ${m.E} inside first jumps to <i>D</i>/${e0} and then relaxes.`],
+  create({root,P}){
+    const plates=[-4.3,4.3].map(y=>{ const p=mkMesh(new THREE.BoxGeometry(9,.2,9),{color:'#9aa4b2',metalness:.7,roughness:.35}); p.position.y=y; root.add(p); return p; });
+    const slab=new THREE.Mesh(new THREE.BoxGeometry(8,4,8),glass('#ff7eb6',.06)); root.add(slab);
+    root.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(8,4,8)),new THREE.LineBasicMaterial({color:'#ff7eb6',transparent:true,opacity:.35})));
+    const cols=[]; for (const x of [-2.6,0,2.6]) for (const z of [-2.6,0,2.6]) for (const y of [-3.1,0,3.1]) cols.push(new V3(x,y,z));
+    const aE=new Arrows(cols.length,COL.E,0.05), aD=new Arrows(cols.length,COL.D,0.05), aP=new Arrows(cols.length,COL.P,0.05); root.add(aE.group,aD.group,aP.group);
+    const atoms=[]; for (const x of [-3.5,-1.3,1.3,3.5]) for (const z of [-3.5,-1.3,1.3,3.5]) for (const y of [-1.3,0,1.3]) atoms.push(new V3(x,y,z));
+    const nuc=new THREE.InstancedMesh(G_SPH,new THREE.MeshLambertMaterial({color:COL.pos,emissive:COL.pos,emissiveIntensity:.4}),atoms.length);
+    const cloud=new THREE.InstancedMesh(G_SPH,new THREE.MeshLambertMaterial({color:COL.neg,transparent:true,opacity:.42,depthWrite:false}),atoms.length);
+    const pa=new Arrows(atoms.length,COL.P,0.022); root.add(nuc,cloud,pa.group);
+    const mk=(n,col)=>{ const im=new THREE.InstancedMesh(G_SPH,new THREE.MeshLambertMaterial({color:col,emissive:col,emissiveIntensity:.5}),n); root.add(im); return im; };
+    const faceSpots=[]; for (const x of range(-3.4,3.4,1.36)) for (const z of range(-3.4,3.4,1.36)) faceSpots.push([x,z]);
+    faceSpots.sort(()=>Math.random()-.5);
+    const bTop=mk(faceSpots.length,COL.neg), bBot=mk(faceSpots.length,COL.pos), fTop=mk(faceSpots.length,COL.neg), fBot=mk(faceSpots.length,COL.pos);
+    const lab=[['ε₀E',COL.E,-.38],['D',COL.D,0],['P',COL.P,.38]].map(([s,c,dx])=>{ const l=label(s,{color:c,italic:false,size:.42}); l.position.set(2.6+dx,4.0,2.6+0.0); root.add(l); return l; });
+    lab[0].position.set(2.6-.38-.3,1.4,2.6); lab[1].position.set(2.6,1.4,2.6+.5); lab[2].position.set(2.6+.5,1.4,2.6);
+    const tl=[label('dielectric slab',{sans:true,size:.36,color:'#ff9ccc'}),label('+σ_f  (free)',{sans:true,size:.36,color:COL.pos}),label('−σ_f  (free)',{sans:true,size:.36,color:COL.neg}),label('−σ_b',{sans:true,size:.34,color:COL.neg}),label('+σ_b',{sans:true,size:.34,color:COL.pos})];
+    tl[0].position.set(-4.4,2.4,4.2); tl[1].position.set(-4.2,-4.9,4.5); tl[2].position.set(-4.2,4.9,4.5); tl[3].position.set(4.6,2.2,-4); tl[4].position.set(4.6,-2.2,-4); root.add(...tl);
+    const st={D:0,P:0,Pt:0}; const _m=new THREE.Matrix4(), up=new V3(0,1,0);
+    function place(im,spots,n,y,r){ for (let i=0;i<spots.length;i++){ if (i<n) _m.makeScale(r,r,r).setPosition(spots[i][0],y,spots[i][1]); else _m.makeScale(0,0,0); im.setMatrixAt(i,_m); } im.instanceMatrix.needsUpdate=true; }
+    function draw(){
+      const D=st.D, Pn=st.P, Ein=(D-Pn), Eout=D, ref=20e-6, Lm=1.85;
+      cols.forEach((c,i)=>{ const inside=Math.abs(c.y)<2, e=inside?Ein:Eout, p=inside?Pn:0;
+        if (P.sE) aE.setC(i,c.clone().add(new V3(-.38,0,0)),up,Lm*Math.abs(e)/ref,1); else aE.hide(i);
+        if (P.sD) aD.setC(i,c,up,Lm*Math.abs(D)/ref,1); else aD.hide(i);
+        if (P.sP && p>1e-9) aP.setC(i,c.clone().add(new V3(.38,0,0)),up,Lm*Math.abs(p)/ref,1); else aP.hide(i); });
+      aE.flush(); aD.flush(); aP.flush();
+      const dlt=0.24*Pn/ref;
+      atoms.forEach((a,i)=>{ _m.makeScale(.09,.09,.09).setPosition(a.x,a.y,a.z); nuc.setMatrixAt(i,_m); _m.makeScale(.3,.3,.3).setPosition(a.x,a.y-dlt,a.z); cloud.setMatrixAt(i,_m);
+        if (dlt>0.01) pa.set(i,new V3(a.x+.0,a.y-dlt-.05,a.z+.0),up,dlt+.25,1,.02); else pa.hide(i); });
+      nuc.instanceMatrix.needsUpdate=cloud.instanceMatrix.needsUpdate=true; pa.flush();
+      const n=faceSpots.length, nb=Math.round(n*Math.min(1,Pn/ref)), nf=Math.round(n*Math.min(1,D/ref));
+      place(bTop,faceSpots,nb,2.04,.09); place(bBot,faceSpots,nb,-2.04,.09); place(fTop,faceSpots,nf,4.17,.1); place(fBot,faceSpots,nf,-4.17,.1);
+    }
+    return {
+      rebuild(){ st.D=P.sf*1e-6; st.Pt=(1-1/P.er)*st.D; draw(); },
+      reset(){ st.D=P.sf*1e-6; st.Pt=(1-1/P.er)*st.D; st.P=st.Pt; },
+      update(t,dt){ if (dt>0){ st.P += (st.Pt-st.P)*(1-Math.exp(-dt*2.2)); } draw(); },
+      readout(){ const D=st.D, Ein=(D-st.P)/EPS0; return [['Free charge <i>σ</i><sub>f</sub>',si(D,'C/m²')],['<i>D</i> (gap and slab)',si(D,'C/m²')],['<i>E</i> in air gaps = <i>D</i>/<i>ε</i><sub>0</sub>',si(D/EPS0,'V/m')],
+        ['<i>E</i> inside slab (now)',si(Ein,'V/m')],['<i>E</i> inside (steady) = <i>D</i>/<i>ε</i><sub>r</sub><i>ε</i><sub>0</sub>',si(D/(P.er*EPS0),'V/m')],['<i>P</i> (now)',si(st.P,'C/m²')],
+        ['Bound charge <i>σ</i><sub>b</sub> = <i>P</i>',si(st.P,'C/m²')],['<i>χ</i><sub>e</sub> = <i>ε</i><sub>r</sub> − 1',fx(P.er-1,2)],['<i>ε</i> = <i>ε</i><sub>r</sub><i>ε</i><sub>0</sub>',si(P.er*EPS0,'F/m')],['Energy density ½<b>E</b>·<b>D</b> in slab',si(0.5*Ein*D,'J/m³')]]; }
+    };
+  }
+},
+
+/* ---------------------------------------------------------------- 9 */
+{ key:'magnetization', short:'Magnetization M', title:'Magnetization: atomic dipoles, B and H', sub:'A solenoid sets H; atomic magnetic dipoles align into M; B = μ₀(H + M).',
+  cam:[8,3,10], axis:6, unit:'cm', legend:['H','B','M','J'],
+  eq:[['Constitutive', `${m.B} = ${u0}(${m.H} + ${m.M})`],['Ampère in matter', `∇×${m.H} = ${m.J}<sub>f</sub>,&nbsp; ${m.J}<sub>b</sub> = ∇×${m.M},&nbsp; ${m.K}<sub>b</sub> = ${m.M}×${m.n}`],['Linear medium', `${m.M} = <i>χ</i><sub>m</sub>${m.H},&nbsp; ${m.B} = <i>μ</i>${m.H},&nbsp; <i>μ</i><sub>r</sub> = 1 + <i>χ</i><sub>m</sub>`]],
+  params:[
+    {k:'I',l:'Coil current I (n = 1000 turns/m)',min:-5,max:5,step:0.1,v:2,u:'A'},
+    {k:'chi',l:'Magnetic susceptibility χ_m',min:-0.5,max:30,step:0.1,v:4},
+    {k:'th',l:'Thermal agitation (visual)',min:0,max:1,step:0.05,v:0.4}],
+  explain:[
+    `A solenoid (copper coil, red current dots) is wound around a core of magnetic material. Each green arrow with its small ring is an atomic magnetic dipole <b style="color:var(--cM)">m</b>: a tiny current loop from electron orbits and spin. Without a field they point every which way. With current in the coil they swing toward the field (or against it for a diamagnet). Green dots circulating on the core surface are the resulting <em>bound</em> surface current. Teal arrows: ${m.H}; green: ${m.M}; blue: ${m.B}/${u0}.`,
+    `The free current in the coil. It produces <i>H</i> = <i>nI</i> inside the long solenoid. The torque <b style="color:var(--cM)">τ</b> = <b style="color:var(--cM)">m</b> × ${m.B} turns each atomic dipole toward ${m.B}; thermal motion keeps knocking them out of line (the jitter).`,
+    `Magnetization ${m.M} (A/m, dipole moment per unit volume), bound surface current density ${m.K}<sub>b</sub> = ${m.M}×${m.n} (A/m) on the core’s side, and bound volume current ${m.J}<sub>b</sub> = ∇×${m.M} (zero here, ${m.M} is uniform). Inside the core ${m.B} is boosted (or reduced) by ${u0}${m.M}.`,
+    `For a paramagnet or soft ferromagnet (<i>χ</i><sub>m</sub> > 0), ${m.M} is along ${m.H} and the bound current flows in the same sense as the coil current, so it adds to ${m.B}. For a diamagnet (<i>χ</i><sub>m</sub> < 0), ${m.M} opposes ${m.H} and ${m.B} inside is weaker than ${u0}${m.H}. Outside a long solenoid both fields are ≈ 0.`,
+    `${m.B} = ${u0}(${m.H} + ${m.M}). Ampère’s law in matter, ∇×${m.H} = ${m.J}<sub>f</sub> + ∂${m.D}/∂<i>t</i>, involves only free current, so ${m.H} = <i>nI</i> is the same in the core and in the air gap. ${m.B} sees all currents, free and bound: ∇×${m.B} = ${u0}(${m.J}<sub>f</sub> + ${m.J}<sub>b</sub>) for static fields. For a linear medium ${m.M} = <i>χ</i><sub>m</sub>${m.H}, so ${m.B} = <i>μ</i>${m.H} with <i>μ</i> = <i>μ</i><sub>r</sub>${u0}. The arrows are drawn in A/m, so ${m.H} + ${m.M} = ${m.B}/${u0} adds up visibly.`,
+    `Increase <i>χ</i><sub>m</sub>: dipoles line up more, ${m.M} and ${m.B} grow, ${m.H} stays. Make it negative: dipoles turn against ${m.H}, ${m.M} reverses, ${m.B} shrinks. Reverse <i>I</i>: everything flips. Note: real paramagnets and diamagnets have |<i>χ</i><sub>m</sub>| ≈ 10⁻⁵–10⁻³, so the slider exaggerates; real ferromagnets are non-linear with hysteresis and saturation, which this linear model omits.`],
+  create({root,P}){
+    const Rc=1.6, Rs=2.6, TURNS=14, Y0=-5, Y1=5;
+    const core=new THREE.Mesh(new THREE.CylinderGeometry(Rc,Rc,10,48,1,true),glass('#8de05a',.07)); root.add(core);
+    root.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.CylinderGeometry(Rc,Rc,10,24,1)),new THREE.LineBasicMaterial({color:'#8de05a',transparent:true,opacity:.25})));
+    const hp=[]; for (let i=0;i<=TURNS*48;i++){ const s=i/(TURNS*48), a=TAU*TURNS*s; hp.push(new V3(Rs*Math.cos(a),Y0+(Y1-Y0)*s,-Rs*Math.sin(a))); }
+    root.add(mkMesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(hp),TURNS*48,.06,6,false),{color:COL.copper,metalness:.6,roughness:.35}));
+    const NC=110, car=pointsCloud(NC,COL.J,.22), cp=car.geometry.attributes.position.array; root.add(car); let cs=0;
+    const NK=56, kb=pointsCloud(NK,COL.M,.2), kp=kb.geometry.attributes.position.array, ky=new Float32Array(NK), ka=new Float32Array(NK); root.add(kb);
+    for (let i=0;i<NK;i++){ ky[i]=rand(-4.8,4.8); ka[i]=rand(0,TAU); }
+    const dip=[]; const xz=[[0.6,0],[-0.6,0],[0.6,0.6],[-0.6,0.6],[0.6,-0.6],[-0.6,-0.6],[1.2,0],[-1.2,0],[1.0,.85],[-1.0,.85],[1.0,-.85],[-1.0,-.85]];
+    for (const y of range(-4,4,1)) for (const [x,z] of xz) dip.push({p:new V3(x,y+.0,z), r:fib(1)[0].set(rand(-1,1),rand(-1,1),rand(-1,1)).normalize(), ph:rand(0,TAU)});
+    const da=new Arrows(dip.length,COL.M,0.022); root.add(da.group);
+    const tor=new THREE.InstancedMesh(new THREE.TorusGeometry(.13,.012,6,20),new THREE.MeshLambertMaterial({color:COL.M}),dip.length); tor.frustumCulled=false; root.add(tor);
+    const cols=[]; for (const y of [-3,0,3]){ cols.push({c:new V3(0,y,0),q:['H','M','B']}); cols.push({c:new V3(2.1,y,0),q:['H','B']}); }
+    const ar={H:new Arrows(cols.length,COL.H,0.05),M:new Arrows(cols.length,COL.M,0.05),B:new Arrows(cols.length,COL.B,0.05)}; root.add(ar.H.group,ar.M.group,ar.B.group);
+    const tags=[label('H',{color:COL.H,italic:false,size:.42}),label('M',{color:COL.M,italic:false,size:.42}),label('B/μ₀',{color:COL.B,italic:false,size:.42}),label('air gap',{sans:true,size:.32,color:'#aebccc'}),label('core',{sans:true,size:.32,color:'#b5e89a'}),label('outside: H ≈ 0, B ≈ 0',{sans:true,size:.32,color:'#aebccc'})];
+    tags[3].position.set(2.1,-4.6,.6); tags[4].position.set(0,-5.6,1.7); tags[5].position.set(4.6,0,0); root.add(...tags);
+    const st={H:0,M:0,a:0}; const _m=new THREE.Matrix4(), _q=new THREE.Quaternion(), Z=new V3(0,0,1), d=new V3(), up=new V3(0,1,0), w=new V3();
+    return {
+      rebuild(){
+        st.H=1000*P.I; st.M=P.chi*st.H; const Bm=st.H+st.M; const ref=Math.max(Math.abs(st.H)*(1+Math.max(P.chi,0)),1);
+        cols.forEach((o,i)=>{ const gap=o.c.x>1; const vals={H:st.H,M:gap?0:st.M,B:gap?st.H:Bm}; const offs=gap?{H:-.25,B:.25,M:0}:{H:-.5,M:0,B:.5};
+          for (const q of ['H','M','B']){ const v=vals[q]; if (!o.q.includes(q)||Math.abs(v)<1e-9){ ar[q].hide(i); continue; } ar[q].setC(i,o.c.clone().add(new V3(0,0,offs[q])),new V3(0,Math.sign(v),0),2.6*Math.abs(v)/ref,1); } });
+        ar.H.flush(); ar.M.flush(); ar.B.flush();
+        tags[0].position.set(0,1.75,-.75); tags[1].position.set(0,1.75+Math.min(1.3,1.3*Math.abs(st.M)/ref),0.05); tags[2].position.set(0,1.75,1.1);
+        st.a=Math.tanh(Math.abs(st.M)/1.5e4)*(1-0.5*P.th*Math.exp(-Math.abs(st.M)/4e4));
+      },
+      update(t,dt){
+        const s=Math.sign(st.M)||1, a=st.a, jit=0.25+0.9*P.th;
+        dip.forEach((o,i)=>{ w.set(Math.sin(t*1.7+o.ph),Math.cos(t*2.3+o.ph*1.3),Math.sin(t*1.1+o.ph*.7)).multiplyScalar(jit*(1-a)*0.6+jit*0.08);
+          d.copy(o.r).add(w).multiplyScalar(1-a).addScaledVector(up,a*s*1.6); if (d.lengthSq()<1e-6) d.set(0,s,0); d.normalize();
+          da.set(i,o.p.clone().addScaledVector(d,-.22),d,.44,1); _q.setFromUnitVectors(Z,d); _m.compose(o.p,_q,new V3(1,1,1)); tor.setMatrixAt(i,_m); });
+        da.flush(); tor.instanceMatrix.needsUpdate=true;
+        cs+=dt*P.I*0.012; for (let i=0;i<NC;i++){ const u=(((i/NC)+cs)%1+1)%1, an=TAU*TURNS*u; cp[i*3]=Rs*Math.cos(an); cp[i*3+1]=Y0+(Y1-Y0)*u; cp[i*3+2]=-Rs*Math.sin(an); } car.geometry.attributes.position.needsUpdate=true;
+        const om=Math.max(-2.5,Math.min(2.5,st.M/2e4)); for (let i=0;i<NK;i++){ ka[i]+=dt*om; kp[i*3]=(Rc+.03)*Math.cos(ka[i]); kp[i*3+1]=ky[i]; kp[i*3+2]=-(Rc+.03)*Math.sin(ka[i]); } kb.geometry.attributes.position.needsUpdate=true;
+        kb.visible=Math.abs(st.M)>1;
+      },
+      readout(){ const B=MU0*(st.H+st.M); return [['<i>H</i> = <i>nI</i> (core and gap)',si(st.H,'A/m')],['<i>M</i> = <i>χ</i><sub>m</sub><i>H</i>',si(st.M,'A/m')],['<i>μ</i><sub>r</sub> = 1 + <i>χ</i><sub>m</sub>',fx(1+P.chi,2)],
+        ['<i>B</i> in core = <i>μ</i><sub>0</sub>(<i>H</i> + <i>M</i>)',si(B,'T')],['<i>B</i> in air gap = <i>μ</i><sub>0</sub><i>H</i>',si(MU0*st.H,'T')],['<i>B</i>/<i>μ</i><sub>0</sub> in core',si(st.H+st.M,'A/m')],
+        ['Bound surface current <i>K</i><sub>b</sub> = <i>M</i>',si(st.M,'A/m')],['Moment of 10 cm³ of core',si(st.M*1e-5,'A·m²')]]; }
+    };
+  }
+},
+
+/* ---------------------------------------------------------------- 10 */
+{ key:'wave', short:'EM wave', title:'The electromagnetic wave', sub:'E ⟂ B ⟂ k, travelling at c = 1/√(μ₀ε₀). Wavelength, frequency, amplitude, phase and speed.',
+  cam:[10,5,11], axis:10, unit:'', axisNames:true, legend:['E','B','k','S'],
+  eq:[['Wave equation', `∇²${m.E} = ${u0}${e0}${fr('∂²'+m.E,'∂<i>t</i>²')}`],['Plane wave', `${m.E} = <i>E</i>₀ x̂ cos(<i>kz</i> − ω<i>t</i> + <i>φ</i>₀),&nbsp; ${m.B} = ${fr('1','<i>c</i>')} ${m.kh} × ${m.E}`],['Speed', `<i>c</i> = ${fr('1','√('+u0+e0+')')} = ${fr('ω','<i>k</i>')} = <i>fλ</i>,&nbsp; <i>E</i> = <i>cB</i>`]],
+  params:[
+    {k:'lam',l:'Wavelength λ (in vacuum)',min:380,max:780,step:5,v:560,u:'nm'},
+    {k:'E0',l:'Amplitude E₀',min:50,max:1000,step:10,v:600,u:'V/m'},
+    {k:'ph',l:'Phase φ₀',min:0,max:360,step:5,v:0,u:'°'},
+    {k:'pol',l:'Polarization',type:'seg',v:0,options:['Linear (x)','Circular']},
+    {k:'iface',l:'Glass interface at z = 0',type:'toggle',v:false},
+    {k:'n',l:'Refractive index n (z > 0)',min:1,max:2.5,step:0.05,v:1.5},
+    {k:'sS',l:'Poynting vector S',type:'toggle',v:true}],
+  explain:[
+    `A plane wave travels along +z. Orange arrows: ${m.E}, oscillating along x. Blue arrows: ${m.B}, oscillating along y, drawn as <i>c</i>${m.B} so it has the same length as ${m.E} in vacuum. The faint squares are wavefronts (planes of constant phase); the white beads ride a crest at the phase speed. Magenta arrows below show the energy flow ${m.S}.`,
+    `The two curl equations feeding each other. A changing ${m.E} creates a curling ${m.B} (Ampère–Maxwell, through ${u0}${e0}∂${m.E}/∂<i>t</i>), and a changing ${m.B} creates a curling ${m.E} (Faraday). Once launched, e.g. by the oscillating charges of step 13, the wave needs no charges or currents to keep going.`,
+    `A self-sustaining travelling disturbance of ${m.E} and ${m.B} that carries energy (intensity <i>I</i> = ½<i>cε</i>₀<i>E</i>₀²) and momentum along ${m.k}.`,
+    `${m.E} ⟂ ${m.B} ⟂ ${m.k}, a right-handed set: ${m.E} × ${m.B} points along ${m.k} (here x̂ × ŷ = ẑ). In vacuum ${m.E} and ${m.B} are in phase: both peak at the same place and time.`,
+    `Taking the curl of Faraday’s law and inserting Ampère–Maxwell (with no charges) gives ∇²${m.E} = ${u0}${e0}∂²${m.E}/∂<i>t</i>², a wave equation with speed <i>c</i> = 1/√(${u0}${e0}) = 299 792 458 m/s. Its solution: phase <i>kz</i> − ω<i>t</i> + <i>φ</i>₀, wave number <i>k</i> = 2π/λ (rad/m, ${m.k} = <i>k</i>ẑ is the wave vector), angular frequency ω = 2π<i>f</i> (rad/s), ω = <i>ck</i>, period <i>T</i> = 1/<i>f</i>, amplitude <i>E</i>₀ = <i>cB</i>₀. In a medium <i>v</i> = <i>c</i>/<i>n</i> with <i>n</i> = √(<i>ε</i><sub>r</sub><i>μ</i><sub>r</sub>), and <i>B</i> = <i>nE</i>/<i>c</i>.`,
+    `Shorter λ (towards violet): higher <i>f</i> and ω, same speed. Change <i>φ</i>₀: the whole pattern shifts. Circular: ${m.E} rotates as it advances and its tip traces a helix. Turn on the interface: inside the glass the wave slows to <i>c</i>/<i>n</i>, its wavelength shrinks to λ/<i>n</i>, and ${m.B} grows relative to ${m.E}. Part of the wave reflects with amplitude (1 − <i>n</i>)/(1 + <i>n</i>) (a 180° phase flip for ${m.E}); incident and reflected waves interfere into a partial standing wave on the left.`],
+  create({root,P}){
+    const zs=range(-10,10,0.25), N=zs.length;
+    const ea=new Arrows(N,COL.E,0.03), ba=new Arrows(N,COL.B,0.03); root.add(ea.group,ba.group);
+    const mkLine=col=>{ const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(321*3),3)); const l=new THREE.Line(g,new THREE.LineBasicMaterial({color:col})); l.frustumCulled=false; root.add(l); return l; };
+    const eL=mkLine(COL.E), bL=mkLine(COL.B);
+    const sz=range(-9.5,9.5,1), sa=new Arrows(sz.length,COL.S,0.04); root.add(sa.group);
+    const ka=new Arrows(1,COL.k,0.06); ka.set(0,new V3(0,0,10.2),new V3(0,0,1),1.6,1); ka.flush(); root.add(ka.group);
+    const kl=vlabel('k',COL.k,.6); kl.position.set(.5,.5,11.6); root.add(kl);
+    const El=vlabel('E',COL.E,.6), Bl=vlabel('cB',COL.B,.55), Sl=vlabel('S',COL.S,.55); root.add(El,Bl,Sl); Sl.position.set(0,-4.5,-9.5);
+    const fronts=[]; for (let i=0;i<8;i++){ const f=new THREE.Mesh(new THREE.PlaneGeometry(7,7),glass('#ffffff',.045)); root.add(f); fronts.push(f); }
+    const beads=[]; for (let i=0;i<8;i++){ const b=new THREE.Mesh(G_SPH,new THREE.MeshBasicMaterial({color:'#ffffff'})); b.scale.setScalar(.12); root.add(b); beads.push(b); }
+    const brk=new THREE.Group(); root.add(brk); const brL=new THREE.Line(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:'#dfe7f0'})); brk.add(brL); const lamL=label('λ',{size:.55}); brk.add(lamL);
+    const med=new THREE.Mesh(new THREE.BoxGeometry(8,8,10),glass('#9fd3ff',.07)); med.position.z=5; root.add(med);
+    const E=new V3(), B=new V3(), kh=new V3();
+    const lamVis=()=>3+(P.lam-380)/400*5;
+    function fields(z,t,outE,outB){
+      const kv=TAU/lamVis(), w=TAU*0.5, phi0=P.ph*Math.PI/180, circ=P.pol===1, n=P.iface?P.n:1;
+      const pol=(psi,o)=> circ? o.set(Math.cos(psi),Math.sin(psi),0) : o.set(Math.cos(psi),0,0);
+      outE.set(0,0,0); outB.set(0,0,0); const tmp=new V3(), tb=new V3();
+      if (!P.iface || z<0){
+        pol(kv*z-w*t+phi0,tmp); outE.add(tmp); tb.set(-tmp.y,tmp.x,0); outB.add(tb); // ẑ×E
+        if (P.iface){ const r=(1-n)/(1+n); pol(-kv*z-w*t+phi0,tmp).multiplyScalar(r); outE.add(tmp); tb.set(tmp.y,-tmp.x,0); outB.add(tb); } // (−ẑ)×E
+      } else { const tt=2/(1+n); pol(n*kv*z-w*t+phi0,tmp).multiplyScalar(tt); outE.add(tmp); tb.set(-tmp.y,tmp.x,0).multiplyScalar(n); outB.add(tb); }
+      outE.multiplyScalar(P.E0); outB.multiplyScalar(P.E0); // outB holds c·B
+    }
+    function draw(t){
+      const sc=3/1000; const ea_=eL.geometry.attributes.position.array, ba_=bL.geometry.attributes.position.array;
+      zs.forEach((z,i)=>{ fields(z,t,E,B); const le=E.length()*sc, lb=B.length()*sc; ea.set(i,new V3(0,0,z),E,le,1); ba.set(i,new V3(0,0,z),B,lb,1); }); ea.flush(); ba.flush();
+      for (let i=0;i<=320;i++){ const z=-10+20*i/320; fields(z,t,E,B); ea_[i*3]=E.x*sc; ea_[i*3+1]=E.y*sc; ea_[i*3+2]=z; ba_[i*3]=B.x*sc; ba_[i*3+1]=B.y*sc; ba_[i*3+2]=z; }
+      eL.geometry.attributes.position.needsUpdate=bL.geometry.attributes.position.needsUpdate=true;
+      sa.group.visible=Sl.visible=P.sS; if (P.sS){ const Smax=(P.E0)**2; sz.forEach((z,i)=>{ fields(z,t,E,B); const S=E.x*B.y-E.y*B.x; sa.set(i,new V3(0,-3.8,z-(S<0?-0.45:0.45)*0),new V3(0,0,Math.sign(S)||1),0.95*Math.abs(S)/Smax,1); }); sa.flush(); Sl.visible=P.sS&&app.showLabels; }
+      fields(-6.5,t,E,B); El.position.set(E.x*sc+(E.x>=0?.5:-.5),E.y*sc+.4,-6.5); Bl.position.set(B.x*sc+.3,B.y*sc+(B.y>=0?.45:-.45),-6.5);
+      // crests (phase = 2πm) for the incident / transmitted wave
+      const lv=lamVis(), kv=TAU/lv, w=TAU*0.5, phi0=P.ph*Math.PI/180, n=P.iface?P.n:1; let bi=0;
+      for (let m_=-6;m_<=12;m_++){
+        // incident: kv z - w t + phi0 = 2π m  → z = (2πm + w t - phi0)/kv, keep z<0 (or all if no iface)
+        const base=((w*t-phi0)%TAU+TAU)%TAU; let z=(TAU*m_+base)/kv;
+        if (P.iface && z>=0){ z=(TAU*m_+base)/(n*kv); }
+        if (z<-10||z>10) continue;
+        if (bi<8){ fields(z,t,E,B); beads[bi].position.set(E.x*sc,E.y*sc,z); beads[bi].visible=true; fronts[bi].position.set(0,0,z); fronts[bi].visible=true; bi++; }
+      }
+      for (;bi<8;bi++){ beads[bi].visible=false; fronts[bi].visible=false; }
+      // λ bracket on the first crest with z<-λ
+      const zc=beads.filter(b=>b.visible).map(b=>b.position.z).filter(z=>z<0).sort((a,b)=>a-b)[0];
+      if (zc!=null && zc+lv<=(P.iface?0:10)){ const yb=3.6; brL.geometry.setFromPoints([new V3(0,yb-.25,zc),new V3(0,yb+.25,zc),new V3(0,yb,zc),new V3(0,yb,zc+lv),new V3(0,yb-.25,zc+lv),new V3(0,yb+.25,zc+lv)]); lamL.position.set(0,yb+.45,zc+lv/2); brk.visible=true; } else brk.visible=false;
+    }
+    return {
+      rebuild(){ med.visible=P.iface; const nl=label(`glass, n = ${fx(P.n,2)}`,{sans:true,size:.38,color:'#9fd3ff'}); nl.position.set(-3.2,4.5,5); nl.visible=P.iface&&app.showLabels; nl.userData.dep='iface'; if (this._nl){ root.remove(this._nl); disposeTree(this._nl);} this._nl=nl; root.add(nl); draw(app.t); },
+      update(t){ draw(t); },
+      readout(){ const lam=P.lam*1e-9, f=C0/lam, w=TAU*f, k=TAU/lam, n=P.iface?P.n:1;
+        const sw=`<span class="sw" style="background:${lamColor(P.lam)}"></span>`;
+        return [['Wavelength λ (vacuum)',sw+si(lam,'m')],['Frequency <i>f</i> = <i>c</i>/λ',si(f,'Hz')],['Angular frequency ω = 2π<i>f</i>',sci(w,'rad/s',3)],['Wave number <i>k</i> = 2π/λ',sci(k,'rad/m',3)],
+          ['Period <i>T</i> = 1/<i>f</i>',si(1/f,'s')],['<i>c</i> = 1/√(<i>μ</i><sub>0</sub><i>ε</i><sub>0</sub>)',C0.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,' ')+' m/s'],['<i>B</i>₀ = <i>E</i>₀/<i>c</i>',si(P.E0/C0,'T')],
+          ['<i>E</i>₀/<i>B</i>₀',si(P.E0/(P.E0/C0),'m/s')],['Intensity ⟨<i>S</i>⟩ = ½<i>cε</i><sub>0</sub><i>E</i>₀²',si(0.5*C0*EPS0*P.E0**2,'W/m²')],['Mean energy density ⟨<i>u</i>⟩ = ½<i>ε</i><sub>0</sub><i>E</i>₀²',si(0.5*EPS0*P.E0**2,'J/m³')],
+          ...(P.iface?[['In glass: <i>v</i> = <i>c</i>/<i>n</i>',si(C0/n,'m/s')],['In glass: λ/<i>n</i>',si(lam/n,'m')],['Reflected amplitude <i>r</i>',fx((1-n)/(1+n),3)],['Transmitted amplitude <i>t</i>',fx(2/(1+n),3)]]:[]),
+          ['Animation slowed by',sci(f/0.5,'×',2)]]; }
+    };
+  }
+},
+
+/* ---------------------------------------------------------------- 11 */
+{ key:'poynting', short:'Energy flow S', title:'Where the energy flows: the Poynting vector', sub:'In a resistive wire the energy enters from the field outside, along S = E × H.',
+  cam:[8,4,10], axis:6, unit:'', legend:['E','H','S','J'],
+  eq:[['Poynting vector', `${m.S} = ${m.E} × ${m.H}`],['Energy density', `<i>u</i> = ½(${m.E}·${m.D} + ${m.B}·${m.H})`],['Poynting’s theorem', `${pd('<i>u</i>')} + ∇·${m.S} = −${m.J}·${m.E}`]],
+  params:[
+    {k:'I',l:'Current I',min:0,max:10,step:0.1,v:5,u:'A'},
+    {k:'R',l:'Resistance per length R′',min:0.05,max:2,step:0.05,v:0.5,u:'Ω/m'}],
+  explain:[
+    `A wire (radius 1 mm, drawn enlarged) carries a steady current <i>I</i> and gets warm. Just outside its surface, ${m.E} (orange) points along the wire: it is the field that pushes the current through the resistance. ${m.H} (teal) circles the wire. Their cross product ${m.S} = ${m.E} × ${m.H} (magenta) points radially <em>into</em> the wire, and the magenta particles show energy streaming in from the surrounding space.`,
+    `The source (battery or generator, far away) sets up ${m.E} along the wire; the current makes ${m.H}. Wherever ${m.E} and ${m.H} coexist and are not parallel, electromagnetic energy flows.`,
+    `An energy flux density ${m.S} (W/m²) and stored field energy with density <i>u</i> = ½(${m.E}·${m.D} + ${m.B}·${m.H}) (J/m³). Inside the wire the energy is converted to heat at the rate ${m.J}·${m.E} per unit volume.`,
+    `${m.S} = ${m.E} × ${m.H}: ŷ × φ̂ = −ρ̂, so ${m.S} points radially inward. Energy does not travel down the inside of the copper; it travels through the space around the circuit and enters the wire through its surface.`,
+    `Poynting’s theorem, derived from Faraday and Ampère–Maxwell: ∂<i>u</i>/∂<i>t</i> + ∇·${m.S} = −${m.J}·${m.E}. Here nothing changes in time, so the inward flux equals the Joule heating. Check on a length <i>L</i>: <i>S</i>·2π<i>aL</i> = (<i>IR</i>′)(<i>I</i>/2π<i>a</i>)·2π<i>aL</i> = <i>I</i>²<i>R</i>′<i>L</i>. For the wave of step 10, ${m.S} points along ${m.k} with time average ½<i>cε</i>₀<i>E</i>₀².`,
+    `Double <i>I</i>: ${m.E} and ${m.H} both double, so ${m.S} and the heating quadruple (<i>P</i> ∝ <i>I</i>²). Increase <i>R</i>′: a larger ${m.E} is needed for the same current, more energy flows in. At <i>I</i> = 0 nothing flows.`],
+  create({root,P}){
+    const a=0.8;
+    const wire=mkMesh(new THREE.CylinderGeometry(a,a,14,48,1,true),{color:'#a3533a',transparent:true,opacity:.55,emissive:'#ff4020',emissiveIntensity:0,side:THREE.DoubleSide,depthWrite:false}); root.add(wire);
+    const NC=120, car=pointsCloud(NC,COL.J,.2), cp=car.geometry.attributes.position.array; root.add(car);
+    for (let i=0;i<NC;i++){ const t=rand(0,TAU), r=Math.sqrt(Math.random())*a*.9; cp[i*3]=r*Math.cos(t); cp[i*3+1]=rand(-7,7); cp[i*3+2]=r*Math.sin(t); }
+    const epos=ringPts([a+.25],[-4.5,-1.5,1.5,4.5],8,.0), eA=new Arrows(epos.length,COL.E,0.04); root.add(eA.group);
+    const hpos=ringPts([a+.45],[-3,0,3],14,.5), hA=new Arrows(hpos.length,COL.H,0.035); root.add(hA.group);
+    const spos=ringPts([a+2.2],range(-4.5,4.5,1.5),8,.25), sA=new Arrows(spos.length,COL.S,0.05); root.add(sA.group);
+    const NP=220, en=pointsCloud(NP,COL.S,.2), ep=en.geometry.attributes.position.array, eR=new Float32Array(NP), eT=new Float32Array(NP), eY=new Float32Array(NP); root.add(en);
+    const resp=i=>{ eR[i]=rand(2.5,6.5); eT[i]=rand(0,TAU); eY[i]=rand(-6,6); }; for (let i=0;i<NP;i++) resp(i);
+    const ls=[vlabel('E',COL.E,.55),vlabel('H',COL.H,.55),vlabel('S',COL.S,.6)]; ls[0].position.set(a+.3,6.1,0); ls[1].position.set(0,3.6,-(a+.8)); ls[2].position.set(a+3.5,.4,0); root.add(...ls);
+    const st={E:0,H:0,S:0}; const ph=new V3(), up=new V3(0,1,0);
+    return {
+      rebuild(){
+        st.E=P.I*P.R; st.H=P.I/(TAU*1e-3); st.S=st.E*st.H;
+        epos.forEach((p,i)=>eA.setC(i,p,up,1.6*sat(st.E,4),1)); eA.flush();
+        hpos.forEach((p,i)=>{ phiHat(p,ph); hA.setC(i,p,ph,0.7*sat(st.H,1200),1); }); hA.flush();
+        spos.forEach((p,i)=>{ const inw=new V3(-p.x,0,-p.z).normalize(); sA.set(i,p,inw,1.7*sat(st.S,3000),1); }); sA.flush();
+        wire.material.emissiveIntensity=Math.min(1.2,P.I*P.I*P.R/30);
+        ls.forEach(l=>l.visible=app.showLabels&&P.I>0);
+      },
+      update(t,dt){
+        const v=dt*1.2*P.I/5; for (let i=0;i<NC;i++){ let y=cp[i*3+1]+v; if (y>7) y-=14; cp[i*3+1]=y; } car.geometry.attributes.position.needsUpdate=true;
+        const sp=dt*2.2*sat(st.S,3000);
+        for (let i=0;i<NP;i++){ eR[i]-=sp*(1+1.5/eR[i]); if (eR[i]<a*0.95) resp(i); ep[i*3]=eR[i]*Math.cos(eT[i]); ep[i*3+1]=eY[i]; ep[i*3+2]=-eR[i]*Math.sin(eT[i]); }
+        en.geometry.attributes.position.needsUpdate=true; en.visible=P.I>0;
+      },
+      readout(){ const aa=1e-3; return [['<i>E</i> along wire = <i>IR</i>′',si(st.E,'V/m')],['<i>H</i> at surface = <i>I</i>/2π<i>a</i>',si(st.H,'A/m')],['<i>B</i> at surface',si(MU0*st.H,'T')],
+        ['|<b>S</b>| = <i>EH</i> (inward)',si(st.S,'W/m²')],['Inflow per metre = <i>S</i>·2π<i>a</i>',si(st.S*TAU*aa,'W/m')],['Joule heat per metre = <i>I</i>²<i>R</i>′',si(P.I*P.I*P.R,'W/m')],
+        ['<i>u</i><sub>E</sub> = ½<i>ε</i><sub>0</sub><i>E</i>²',si(0.5*EPS0*st.E**2,'J/m³')],['<i>u</i><sub>B</sub> = ½<i>μ</i><sub>0</sub><i>H</i>²',si(0.5*MU0*st.H**2,'J/m³')]]; }
+    };
+  }
+},
+
+/* ---------------------------------------------------------------- 12 */
+{ key:'lorentz', short:'Lorentz force', title:'The Lorentz force on a moving charge', sub:'F = q(E + v × B): gyration around B, drift along E × B.',
+  cam:[12,9,15], axis:12, unit:'cm', legend:['E','B','v','F'],
+  eq:[['Lorentz force', `${m.F} = <i>q</i>(${m.E} + ${m.v} × ${m.B})`],['Gyration', `ω<sub>c</sub> = ${fr('|<i>q</i>|<i>B</i>','<i>m</i>')},&nbsp; <i>r</i><sub>L</sub> = ${fr('<i>mv</i><sub>⟂</sub>','|<i>q</i>|<i>B</i>')}`],['E × B drift', `${m.v}<sub>d</sub> = ${fr(m.E+' × '+m.B,'<i>B</i>²')}`]],
+  params:[
+    {k:'q',l:'Charge q (proton mass)',min:-2,max:2,step:1,v:1,u:'e'},
+    {k:'B',l:'Magnetic field B (along y)',min:0,max:20,step:0.5,v:10,u:'mT'},
+    {k:'E',l:'Electric field E (along x)',min:0,max:200,step:5,v:40,u:'V/m'},
+    {k:'vp',l:'Initial speed ⟂ B (along x)',min:0,max:20,step:0.5,v:10,u:'km/s'},
+    {k:'vl',l:'Initial speed ∥ B (along y)',min:-5,max:5,step:0.1,v:1,u:'km/s'}],
+  explain:[
+    `A particle with proton mass and charge <i>q</i> starts at the origin in a uniform electric field ${m.E} (along x, faint orange) and magnetic field ${m.B} (along y, faint blue). Arrows on the particle: velocity ${m.v} (grey), electric force <i>q</i>${m.E} (orange), magnetic force <i>q</i>${m.v}×${m.B} (blue), total ${m.F} (white). The trail shows its path. Time is slowed so one gyration at 10 mT takes about 4 s.`,
+    `Fields act on charges. The electric part pushes along ${m.E} regardless of motion; the magnetic part acts only on moving charge and always sideways to ${m.v}.`,
+    `An acceleration ${m.F}/<i>m</i>. The magnetic force does no work (${m.F}<sub>B</sub> ⟂ ${m.v}), so it changes only the direction of motion; only ${m.E} can change the particle’s energy. For a continuous charge distribution the force density is <b>f</b> = <i>ρ</i>${m.E} + ${m.J}×${m.B}.`,
+    `<i>q</i>${m.v}×${m.B} is perpendicular to both ${m.v} and ${m.B}, so the particle circles around ${m.B} (a helix if it also moves along ${m.B}). With ${m.E} ⟂ ${m.B} the circle’s centre drifts along ${m.E}×${m.B} (+z here) at speed <i>E</i>/<i>B</i>, the same for positive and negative charges.`,
+    `${m.F} = <i>q</i>(${m.E} + ${m.v}×${m.B}). Cyclotron frequency ω<sub>c</sub> = |<i>q</i>|<i>B</i>/<i>m</i> (independent of speed), Larmor radius <i>r</i><sub>L</sub> = <i>mv</i><sub>⟂</sub>/|<i>q</i>|<i>B</i>, drift ${m.v}<sub>d</sub> = ${m.E}×${m.B}/<i>B</i>². Together with Maxwell’s four equations this completes classical electrodynamics: the equations say how charges make fields, the Lorentz force says how fields move charges.`,
+    `Flip the sign of <i>q</i>: the sense of gyration reverses, the drift direction does not. <i>B</i> = 0: pure acceleration along ${m.E} (a parabola). <i>E</i> = 0: a clean circle or helix. Increase <i>B</i>: tighter, faster circles and slower drift. Large <i>E</i>/<i>B</i> compared with <i>v</i>: the path becomes a cycloid with cusps.`],
+  create({root,P}){
+    const bg=[]; for (const x of [-8,0,8]) for (const y of [-6,6]) for (const z of [-8,0,8]) bg.push(new V3(x,y,z));
+    const bE=new Arrows(bg.length,COL.E,0.03,{opacity:.45}), bB=new Arrows(bg.length,COL.B,0.03,{opacity:.45}); root.add(bE.group,bB.group);
+    const part=new THREE.Mesh(G_SPH,new THREE.MeshBasicMaterial({color:'#ffffff'})); part.scale.setScalar(.25); root.add(part);
+    const ar=new Arrows(4,'#ffffff',0.06); root.add(ar.group);
+    const MAXT=3000, tg=new THREE.BufferGeometry(); tg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(MAXT*3),3)); tg.setDrawRange(0,0);
+    const trail=new THREE.Line(tg,new THREE.LineBasicMaterial({color:'#e6dfcf',transparent:true,opacity:.8})); trail.frustumCulled=false; root.add(trail);
+    const ls=[vlabel('v',COL.v,.5),label('qE',{color:COL.E,italic:false,size:.45}),label('qv×B',{color:COL.B,italic:false,size:.45}),vlabel('F',COL.F,.5)]; root.add(...ls);
+    const El=vlabel('E',COL.E,.5); El.position.set(9.6,6,8); const Bl=vlabel('B',COL.B,.5); Bl.position.set(8.4,8,8); root.add(El,Bl);
+    const s={x:new V3(),v:new V3(),n:0}; const Tref=TAU*MP/(QE*0.01), scale=Tref/4;
+    const tmp=new V3(), vm=new V3(), tv=new V3(), sv=new V3(), vp=new V3(), Ev=new V3(), Bv=new V3();
+    function reset(){ s.x.set(0,0,0); s.v.set(P.vp*1e3,P.vl*1e3,0); s.n=0; tg.setDrawRange(0,0); }
+    function step(dtr){ const q=P.q*QE, mq=q/MP; Ev.set(P.E,0,0); Bv.set(0,P.B*1e-3,0);
+      vm.copy(s.v).addScaledVector(Ev,mq*dtr/2); tv.copy(Bv).multiplyScalar(mq*dtr/2); const t2=tv.lengthSq(); sv.copy(tv).multiplyScalar(2/(1+t2));
+      vp.copy(vm).add(tmp.crossVectors(vm,tv)); vm.add(tmp.crossVectors(vp,sv)); s.v.copy(vm).addScaledVector(Ev,mq*dtr/2); s.x.addScaledVector(s.v,dtr); }
+    function forces(){ const q=P.q*QE; const FE=new V3(q*P.E,0,0), FB=new V3().crossVectors(s.v,new V3(0,P.B*1e-3,0)).multiplyScalar(q); return {FE,FB,F:FE.clone().add(FB)}; }
+    function drawArrows(){
+      const p=s.x.clone().multiplyScalar(100); part.position.copy(p);
+      part.material.color.set(P.q>0?COL.pos:P.q<0?COL.neg:'#aebccc');
+      const {FE,FB,F}=forces(), Fref=QE*600, list=[[s.v,COL.v,Math.min(3,2.4*s.v.length()/2e4)],[FE,COL.E,Math.min(3,2.4*FE.length()/Fref)],[FB,COL.B,Math.min(3,2.4*FB.length()/Fref)],[F,COL.F,Math.min(3,2.4*F.length()/Fref)]];
+      list.forEach(([vec,c,L],i)=>{ ar.set(i,p,vec,L,1,i===3?0.07:0.05,c); const lb=ls[i]; if (L>0.05&&vec.length()>0){ lb.position.copy(p).addScaledVector(vec.clone().normalize(),L+.45); lb.visible=app.showLabels; } else lb.visible=false; }); ar.flush();
+    }
+    return {
+      rebuild(){
+        bg.forEach((p,i)=>{ bE.set(i,p,new V3(1,0,0),2.2*P.E/200,1); bB.set(i,p.clone().add(new V3(.8,-1,.8)),new V3(0,1,0),2.2*P.B/20,1); }); bE.flush(); bB.flush();
+        reset(); drawArrows();
+      },
+      reset(){ reset(); },
+      update(t,dt){
+        if (dt>0){ const dtr=dt*scale, B=P.B*1e-3, q=Math.abs(P.q)*QE; const Tc=(B>0&&q>0)?TAU*MP/(q*B):Tref; const nsub=Math.max(1,Math.ceil(dtr/(Tc/80))); for (let k=0;k<nsub;k++) step(dtr/nsub);
+          const p=s.x.clone().multiplyScalar(100);
+          if (Math.abs(p.x)>14||Math.abs(p.y)>14||Math.abs(p.z)>14){ reset(); }
+          else { const a=tg.attributes.position.array; if (s.n>=MAXT){ a.copyWithin(0,3); s.n=MAXT-1; } a[s.n*3]=p.x; a[s.n*3+1]=p.y; a[s.n*3+2]=p.z; s.n++; tg.setDrawRange(0,s.n); tg.attributes.position.needsUpdate=true; } }
+        drawArrows();
+      },
+      readout(){ const B=P.B*1e-3, q=Math.abs(P.q)*QE, {FE,FB,F}=forces(); const vperp=Math.hypot(s.v.x,s.v.z);
+        return [['Speed |<b>v</b>|',si(s.v.length(),'m/s')],['ω<sub>c</sub> = |<i>q</i>|<i>B</i>/<i>m</i>',q&&B?si(q*B/MP,'rad/s'):'—'],['<i>f</i><sub>c</sub>',q&&B?si(q*B/(MP*TAU),'Hz'):'—'],
+          ['<i>r</i><sub>L</sub> (initial <i>v</i><sub>⟂</sub>)',q&&B?si(MP*P.vp*1e3/(q*B),'m'):'—'],['Drift <i>v</i><sub>d</sub> = <i>E</i>/<i>B</i> (along +z)',B?si(P.E/B,'m/s'):'—'],
+          ['|<i>q</i><b>E</b>|',si(FE.length(),'N')],['|<i>q</i><b>v</b>×<b>B</b>|',si(FB.length(),'N')],['|<b>F</b>|',si(F.length(),'N')],['Animation: 1 s shows',si(scale,'s')]]; }
+    };
+  }
+},
+
+/* ---------------------------------------------------------------- 13 */
+{ key:'dipole', short:'All together', title:'Everything together: a radiating dipole', sub:'Oscillating charge drives all four equations at once and sends a wave out at c.',
+  cam:[14,6,15], axis:11, unit:'', legend:['E','B','S','J','pos','neg'],
+  eq:[['Gauss', `∇·${m.D} = <i>ρ</i><sub>f</sub>,&nbsp; ∇·${m.B} = 0`],['Faraday', EQ.faraday.diff],['Ampère–Maxwell', EQ.ampere.diff]],
+  params:[
+    {k:'f',l:'Real frequency f',min:1,max:1000,step:1,v:100,u:'MHz'},
+    {k:'lv',l:'Wavelength on screen',min:3,max:10,step:0.1,v:5.5,u:'units'},
+    {k:'np',l:'Number of E-field slices',min:1,max:4,step:1,v:2},
+    {k:'sB',l:'B arrows',type:'toggle',v:true},{k:'sS',l:'S arrows (far field)',type:'toggle',v:true}],
+  explain:[
+    `Charges oscillate up and down along the y-axis: the top end is + when the bottom is − and vice versa (a Hertzian dipole antenna, <b>p</b>(<i>t</i>) = <i>p</i>₀ cos ω<i>t</i> ŷ). The orange curves on the vertical slices are electric field lines. Close to the dipole they look like the static dipole of step 1; further out they pinch off into closed loops that travel outward. Blue arrows: ${m.B}, circling the axis. Magenta arrows: the radiated energy flux ${m.S}.`,
+    `Accelerating charge. The oscillating current <i>I</i> = d<i>p</i>/d<i>t</i> makes ${m.B} (Ampère), the changing ${m.B} makes a curling ${m.E} (Faraday), the changing ${m.E} makes ${m.B} (Maxwell’s term), and so on outward. Near the charges, Gauss’s law ties the ${m.E} lines to them; Gauss’s law for ${m.B} keeps every ${m.B} line a closed ring.`,
+    `Electromagnetic radiation: fields that fall off as 1/<i>r</i> (not 1/<i>r</i>²) and so carry energy to infinity. Total radiated power <i>P</i> = ${u0}<i>p</i>₀²ω⁴/(12π<i>c</i>).`,
+    `In the far zone ${m.E} is along θ̂ (in the vertical slices), ${m.B} along φ̂ (horizontal circles), and ${m.S} = ${m.E}×${m.H} radially outward, all mutually perpendicular as in step 10. Radiation is strongest in the equatorial plane (θ = 90°) and zero along the dipole axis (intensity ∝ sin²θ).`,
+    `All four Maxwell equations act here at once. Their solution for this source has near-field terms (∝ 1/<i>r</i>³, 1/<i>r</i>²) that store and return energy, and a radiation term ∝ 1/<i>r</i> that escapes. The orange contours are the exact Hertz field-line function sin²θ[cos(<i>kr</i> − ω<i>t</i>) − sin(<i>kr</i> − ω<i>t</i>)/(<i>kr</i>)].`,
+    `Raise the real frequency: the readout shows λ = <i>c</i>/<i>f</i> shrinking and power growing as ω⁴ (doubling <i>f</i> gives 16× the power; the same scaling makes the sky blue by Rayleigh scattering). Change the on-screen wavelength to see more or fewer detached loops. Add slices to see the 3D, rotationally symmetric pattern.`],
+  create({root,P}){
+    const SZ=26;
+    const vert=`varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`;
+    const frag=`uniform float uT; uniform float uK; uniform vec3 uCol; varying vec2 vUv;
+      void main(){ vec2 p=(vUv-0.5)*${SZ.toFixed(1)}; float r=length(p); if(r<0.35) discard;
+        float st=abs(p.x)/r; float kr=uK*r; float ps=kr-uT;
+        float C=st*st*(cos(ps)-sin(ps)/kr);
+        float N=7.0; float f=C*N; float w=fwidth(f);
+        float d=abs(fract(f+0.5)-0.5); float line=1.0-smoothstep(0.0,1.2*w+0.0001,d);
+        line*= step(0.05, abs(f)) ;
+        float fade=smoothstep(${(SZ/2).toFixed(1)},${(SZ/2-3).toFixed(1)},r)*smoothstep(0.35,1.0,r);
+        float fill=0.05*smoothstep(0.0,0.5,abs(C));
+        vec3 col=uCol*(line*1.1)+vec3(1.0,0.55,0.26)*fill*(C>0.0?1.0:0.5);
+        gl_FragColor=vec4(col, (line*0.95+fill)*fade);
+      }`;
+    const mats=[], planes=[];
+    for (let i=0;i<4;i++){ const mt=new THREE.ShaderMaterial({vertexShader:vert,fragmentShader:frag,uniforms:{uT:{value:0},uK:{value:1},uCol:{value:new THREE.Color(COL.E)}},transparent:true,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,extensions:{derivatives:true}});
+      const pl=new THREE.Mesh(new THREE.PlaneGeometry(SZ,SZ),mt); root.add(pl); mats.push(mt); planes.push(pl); }
+    const bpos=[]; for (const r of [2.5,4.5,6.5,8.5,10.5]) for (const th of [40,65,90,115,140]) for (let i=0;i<10;i++){ const t=th*Math.PI/180, ph=TAU*(i+.5)/10; bpos.push(new V3(r*Math.sin(t)*Math.cos(ph), r*Math.cos(t), -r*Math.sin(t)*Math.sin(ph))); }
+    const bA=new Arrows(bpos.length,COL.B,0.03); root.add(bA.group);
+    const spos=[]; for (const th of [20,40,60,75,90,105,120,140,160]) for (let i=0;i<8;i++){ const t=th*Math.PI/180, ph=TAU*(i+.25)/8, r=11; spos.push(new V3(r*Math.sin(t)*Math.cos(ph), r*Math.cos(t), -r*Math.sin(t)*Math.sin(ph))); }
+    const sA=new Arrows(spos.length,COL.S,0.04); root.add(sA.group);
+    const top=new THREE.Mesh(G_SPH,new THREE.MeshBasicMaterial({color:'#fff'})), bot=new THREE.Mesh(G_SPH,new THREE.MeshBasicMaterial({color:'#fff'})); top.position.y=.55; bot.position.y=-.55; top.scale.setScalar(.2); bot.scale.setScalar(.2); root.add(top,bot);
+    root.add(new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,1.1,8),new THREE.MeshBasicMaterial({color:'#9aa4b2'})));
+    const iA=new Arrows(1,COL.J,0.05); root.add(iA.group);
+    const ls=[vlabel('E',COL.E,.6),vlabel('B',COL.B,.6),vlabel('S',COL.S,.6)]; ls[0].position.set(4,3.5,0); ls[1].position.set(0,1.6,-6.7); ls[2].position.set(11.8,.6,0); root.add(...ls);
+    const ph=new V3(); let phase=0;
+    return {
+      rebuild(){ planes.forEach((pl,i)=>{ pl.visible=i<P.np; pl.rotation.y=i*Math.PI/P.np; }); bA.group.visible=P.sB; sA.group.visible=P.sS; ls[1].visible=P.sB&&app.showLabels; ls[2].visible=P.sS&&app.showLabels; },
+      update(t,dt){
+        const k=TAU/P.lv, w=TAU*0.35; phase=w*t; mats.forEach(mt=>{ mt.uniforms.uT.value=phase; mt.uniforms.uK.value=k; });
+        const pnow=Math.cos(phase); top.material.color.set(pnow>=0?COL.pos:COL.neg); bot.material.color.set(pnow>=0?COL.neg:COL.pos); top.scale.setScalar(.12+.12*Math.abs(pnow)); bot.scale.setScalar(.12+.12*Math.abs(pnow));
+        const I=-Math.sin(phase); iA.set(0,new V3(0,-.45*Math.sign(I),0),new V3(0,Math.sign(I)||1,0),.9*Math.abs(I)+.01,1); iA.flush();
+        if (P.sB){ bpos.forEach((p,i)=>{ const r=p.length(), st=Math.hypot(p.x,p.z)/r, kr=k*r, ps=kr-phase; const H=st/r*(Math.cos(ps)-Math.sin(ps)/kr); phiHat(p,ph).multiplyScalar(Math.sign(H)||1); bA.setC(i,p,ph,1.1*sat(H*6,0.6),.4+.6*sat(H*6,.6)); }); bA.flush(); }
+        if (P.sS){ spos.forEach((p,i)=>{ const r=p.length(), st=Math.hypot(p.x,p.z)/r, c=Math.cos(k*r-phase); const S=st*st*c*c; sA.set(i,p,p,1.6*S,1); }); sA.flush(); }
+      },
+      readout(){ const f=P.f*1e6, w=TAU*f, p0=1e-11; const Pw=MU0*p0*p0*w**4/(12*Math.PI*C0);
+        return [['Frequency <i>f</i>',si(f,'Hz')],['Wavelength λ = <i>c</i>/<i>f</i>',si(C0/f,'m')],['Dipole moment <i>p</i>₀ (example)',si(p0,'C·m')],['Radiated power <i>P</i> = <i>μ</i><sub>0</sub><i>p</i>₀²ω⁴/12π<i>c</i>',si(Pw,'W')],
+          ['Phase ω<i>t</i> (mod 360°)',fx(((phase*180/Math.PI)%360+360)%360,0)+'°'],['Far-field <i>E</i>/<i>B</i>',si(C0,'m/s')]]; }
+    };
+  }
+}
+];
+
+/* wavelength → display colour */
+function lamColor(l){ let r=0,g=0,b=0; if(l<440){r=-(l-440)/60;b=1}else if(l<490){g=(l-440)/50;b=1}else if(l<510){g=1;b=-(l-510)/20}else if(l<580){r=(l-510)/70;g=1}else if(l<645){r=1;g=-(l-645)/65}else{r=1}
+  let f=1; if(l<420) f=.3+.7*(l-380)/40; else if(l>700) f=.3+.7*(780-l)/80; const c=x=>Math.round(255*Math.pow(Math.max(0,x)*f,.8)); return `rgb(${c(r)},${c(g)},${c(b)})`; }
+
+/* ================================================================
+   UI
+   ================================================================ */
+const $ = id => document.getElementById(id);
+const stepsNav=$('steps');
+SCENES.forEach((s,i)=>{ const b=document.createElement('button'); b.className='step'; b.innerHTML=`<b>${String(i+1).padStart(2,'0')}</b>${s.short}`; b.onclick=()=>go(i); stepsNav.appendChild(b); });
+$('prev').onclick=()=>go(Math.max(0,app.i-1)); $('next').onclick=()=>go(Math.min(SCENES.length-1,app.i+1));
+
+function setTab(which){ [['tStep','vStep'],['tEq','vEq'],['tSym','vSym']].forEach(([t,v])=>{ const on=t===which; $(t).setAttribute('aria-selected',on); $(v).hidden=!on; }); }
+$('tStep').onclick=()=>setTab('tStep'); $('tEq').onclick=()=>setTab('tEq'); $('tSym').onclick=()=>setTab('tSym');
+
+function fmtParam(p,v){ if (p.type==='toggle') return v?'on':'off'; const d=p.step<0.1?2:p.step<1?1:0; return `${(+v).toFixed(d)}${p.u?' '+p.u:''}`; }
+
+function renderPanel(def){
+  const v=$('vStep'); const i=SCENES.indexOf(def);
+  let h=`<div class="kicker">STEP ${String(i+1).padStart(2,'0')} / ${SCENES.length}</div><h2>${def.title}</h2><p class="sub">${def.sub}</p>`;
+  h+=`<div class="sec"><h4>Controls</h4><div id="ctls"></div></div>`;
+  h+=`<div class="sec"><h4>Live values (SI)</h4><table class="ro" id="ro"></table></div>`;
+  if (def.chart) h+=`<div class="sec"><h4>Time trace</h4><div class="chartbox"><canvas id="chart"></canvas><div class="chartleg">${def.chart.map(([n,c])=>`<span><i style="background:${c}"></i>${n}</span>`).join('')}<span>each scaled to its own peak</span></div></div></div>`;
+  h+=`<div class="sec"><h4>The equation for this step</h4>${def.eq.map(([l,e])=>`<div class="eqbig"><div class="row"><span>${l}</span><span>${e}</span></div></div>`).join('')}</div>`;
+  h+=`<div class="sec"><h4>Explanation</h4><dl class="qa">${def.explain.map((x,k)=>`<dt><span>${k+1}</span>${Q6[k]}</dt><dd>${x}</dd>`).join('')}</dl></div>`;
+  if (i<SCENES.length-1) h+=`<div class="sec"><button class="tb" id="nextBig" style="width:100%">Next step: ${SCENES[i+1].title} ›</button></div>`;
+  v.innerHTML=h;
+  const nb=$('nextBig'); if (nb) nb.onclick=()=>{ go(i+1); $('panel').scrollTop=0; };
+  const ctls=$('ctls');
+  def.params.forEach(p=>{
+    const id='p-'+def.key+'-'+p.k; let el;
+    if (p.type==='toggle'){ el=document.createElement('label'); el.className='tog'; el.htmlFor=id; el.innerHTML=`<span>${p.l}</span><input type="checkbox" id="${id}" ${app.P[p.k]?'checked':''}>`; ctls.appendChild(el); el.querySelector('input').onchange=e=>setParam(p,e.target.checked); return; }
+    el=document.createElement('div'); el.className='ctl';
+    if (p.type==='seg'){ el.innerHTML=`<label>${p.l}</label><output></output><div class="seg" role="group">${p.options.map((o,k)=>`<button type="button" data-k="${k}" aria-pressed="${app.P[p.k]===k}">${o}</button>`).join('')}</div>`;
+      el.querySelectorAll('button').forEach(b=>b.onclick=()=>{ el.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b)); setParam(p,+b.dataset.k); }); }
+    else if (p.type==='select'){ el.innerHTML=`<label for="${id}">${p.l}</label><output></output><select id="${id}">${p.options.map((o,k)=>`<option value="${k}" ${app.P[p.k]===k?'selected':''}>${o}</option>`).join('')}</select>`; el.querySelector('select').onchange=e=>setParam(p,+e.target.value); }
+    else { el.innerHTML=`<label for="${id}">${p.l}</label><output id="${id}-o">${fmtParam(p,app.P[p.k])}</output><input type="range" id="${id}" min="${p.min}" max="${p.max}" step="${p.step}" value="${app.P[p.k]}">`;
+      const inp=el.querySelector('input'), out=el.querySelector('output'); inp.oninput=()=>{ out.textContent=fmtParam(p,+inp.value); setParam(p,+inp.value); }; }
+    ctls.appendChild(el);
+  });
+  // readout skeleton
+  app.roRows=[]; const ro=$('ro');
+  // equation card + legend
+  $('eqcard').innerHTML=`<h3><span>${def.title}</span><button id="eqmin" aria-expanded="true">hide</button></h3>`+def.eq.map(([l,e])=>`<div class="eqrow"><span class="l">${l}</span><span class="r">${e}</span></div>`).join('');
+  $('eqmin').onclick=()=>{ const c=$('eqcard'); const mn=c.classList.toggle('min'); $('eqmin').textContent=mn?'show':'hide'; $('eqmin').setAttribute('aria-expanded',!mn); };
+  $('legend').innerHTML=def.legend.map(k=>{ const [s,n,c]=LEG[k]; const col=COL[c]||COL[k]; return `<div><i style="background:${col}"></i><span style="color:${col}">${s}</span><em>${n}</em></div>`; }).join('');
+}
+
+function setParam(p,v){ app.P[p.k]=v; app.dirty.add(p.k); }
+
+function updateReadout(){
+  if (!app.inst || !app.inst.readout) return;
+  const rows=app.inst.readout(), ro=$('ro'); if (!ro) return;
+  if (app.roRows.length!==rows.length){ ro.innerHTML=rows.map(()=>'<tr><td></td><td></td></tr>').join(''); app.roRows=[...ro.querySelectorAll('tr')]; app.roLab=[]; }
+  rows.forEach(([l,v],i)=>{ const tr=app.roRows[i]; if (app.roLab[i]!==l){ tr.cells[0].innerHTML=l; app.roLab[i]=l; } if (tr.cells[1].innerHTML!==v) tr.cells[1].innerHTML=v; });
+  const cv=$('chart'); if (cv && app.inst.chart) drawChart(cv, app.inst.chart(), app.def.chart);
+}
+function drawChart(cv,h,meta){
+  const dpr=Math.min(2,window.devicePixelRatio||1), W=cv.clientWidth, H=cv.clientHeight; if (!W) return;
+  if (cv.width!==W*dpr){ cv.width=W*dpr; cv.height=H*dpr; }
+  const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+  g.strokeStyle='#223040'; g.lineWidth=1; g.beginPath(); g.moveTo(0,H/2); g.lineTo(W,H/2); for (let k=1;k<4;k++){ g.moveTo(W*k/4,0); g.lineTo(W*k/4,H); } g.stroke();
+  const n=h.t.length; if (n<2) return;
+  h.s.forEach((s,j)=>{ const mx=Math.max(1e-30,...s.map(Math.abs)); g.strokeStyle=meta[j][1]; g.lineWidth=2; g.beginPath(); s.forEach((v,i)=>{ const x=W*i/(h.n-1), y=H/2-(H/2-6)*v/mx; i?g.lineTo(x,y):g.moveTo(x,y); }); g.stroke(); });
+  g.fillStyle='#5d6d80'; g.font='10px "IBM Plex Mono", monospace'; g.fillText('past ← time → now',6,H-5);
+}
+
+/* All-equations tab */
+function renderEqTab(){
+  const card=(k)=>{ const q=EQ[k]; return `<div class="eqbig"><h5>${q.name}<button data-go="${q.step}">open step ${q.step+1}</button></h5>
+    <div class="row"><span>Differential</span><span>${q.diff}</span></div><div class="row"><span>Integral</span><span>${q.int}</span></div>
+    <div class="row"><span>In vacuum</span><span>${q.vdiff}</span></div><p>${q.say}</p></div>`; };
+  $('vEq').innerHTML=`<div class="kicker">REFERENCE</div><h2>Maxwell’s equations</h2><p class="sub">Macroscopic form (with ${m.D}, ${m.H}, free sources) and vacuum form (with ${m.E}, ${m.B}, all sources).</p>
+   <div class="sec"><h4>The four equations</h4>${['gaussE','gaussB','faraday','ampere'].map(card).join('')}</div>
+   <div class="sec"><h4>Matter: constitutive relations</h4>
+    <div class="eqbig"><div class="row"><span>Electric</span><span>${m.D} = ${e0}${m.E} + ${m.P} = <i>ε</i>${m.E}</span></div><div class="row"><span>Magnetic</span><span>${m.B} = ${u0}(${m.H} + ${m.M}) = <i>μ</i>${m.H}</span></div>
+    <div class="row"><span>Bound charge</span><span><i>ρ</i><sub>b</sub> = −∇·${m.P},&nbsp; <i>σ</i><sub>b</sub> = ${m.P}·${m.n}</span></div><div class="row"><span>Bound current</span><span>${m.J}<sub>b</sub> = ∇×${m.M} + ${pd(m.P)},&nbsp; <b>K</b><sub>b</sub> = ${m.M}×${m.n}</span></div>
+    <div class="row"><span>Linear media</span><span><i>ε</i> = <i>ε</i><sub>r</sub>${e0} = (1+<i>χ</i><sub>e</sub>)${e0},&nbsp; <i>μ</i> = (1+<i>χ</i><sub>m</sub>)${u0}</span></div><p>Total = free + bound: <i>ρ</i> = <i>ρ</i><sub>f</sub> + <i>ρ</i><sub>b</sub>, ${m.J} = ${m.J}<sub>f</sub> + ${m.J}<sub>b</sub>. ${m.E} and ${m.B} feel all of it; ${m.D} and ${m.H} are defined so that only the free part appears in their equations.</p></div></div>
+   <div class="sec"><h4>Potentials</h4><div class="eqbig"><div class="row"><span>Fields</span><span>${m.E} = −∇<i>φ</i> − ${pd(m.A)},&nbsp; ${m.B} = ∇×${m.A}</span></div><p>∇·${m.B} = 0 is automatic because ∇·(∇×${m.A}) = 0; Faraday’s law is automatic because ∇×(∇<i>φ</i>) = 0. <i>φ</i> (or <i>V</i>) in volts, ${m.A} in T·m.</p></div></div>
+   <div class="sec"><h4>Force, energy, conservation</h4><div class="eqbig"><div class="row"><span>Lorentz</span><span>${m.F} = <i>q</i>(${m.E} + ${m.v}×${m.B})</span></div>
+    <div class="row"><span>Energy</span><span><i>u</i> = ½(${m.E}·${m.D} + ${m.B}·${m.H}),&nbsp; ${m.S} = ${m.E}×${m.H}</span></div><div class="row"><span>Poynting</span><span>${pd('<i>u</i>')} + ∇·${m.S} = −${m.J}·${m.E}</span></div>
+    <div class="row"><span>Charge</span><span>${pd('<i>ρ</i>')} + ∇·${m.J} = 0</span></div></div></div>
+   <div class="sec"><h4>Waves</h4><div class="eqbig"><div class="row"><span>Wave eq.</span><span>∇²${m.E} = ${u0}${e0}${fr('∂²'+m.E,'∂<i>t</i>²')}</span></div><div class="row"><span>Relations</span><span><i>c</i> = 1/√(${u0}${e0}),&nbsp; ω = <i>ck</i>,&nbsp; <i>k</i> = 2π/λ,&nbsp; <i>E</i> = <i>cB</i></span></div><div class="row"><span>Medium</span><span><i>v</i> = 1/√(<i>με</i>) = <i>c</i>/<i>n</i></span></div></div></div>`;
+  $('vEq').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ go(+b.dataset.go); setTab('tStep'); });
+}
+
+function renderSymTab(){
+  const sw=c=>`<span class="sw" style="background:${c}"></span>`;
+  const R=[['g','Fields'],
+    [`${sw(COL.E)}${m.E}`,'Electric field (force per unit charge)','V/m = N/C'],
+    [`${sw(COL.D)}${m.D}`,'Electric displacement; sourced by free charge only','C/m²'],
+    [`${sw(COL.B)}${m.B}`,'Magnetic flux density; force on moving charge','T = Wb/m²'],
+    [`${sw(COL.H)}${m.H}`,'Magnetic field strength; set by free current','A/m'],
+    [`${sw(COL.P)}${m.P}`,'Polarization: electric dipole moment per volume','C/m²'],
+    [`${sw(COL.M)}${m.M}`,'Magnetization: magnetic dipole moment per volume','A/m'],
+    [`${sw(COL.S)}${m.S}`,'Poynting vector: energy flux density, E × H','W/m²'],
+    [`${sw(COL.F)}${m.F}`,'Lorentz force q(E + v × B)','N'],
+    ['g','Sources'],
+    ['<i>q</i>, <i>Q</i>','Electric charge','C'],
+    ['<i>ρ</i>','Total charge density = ρ<sub>f</sub> + ρ<sub>b</sub>','C/m³'],
+    ['<i>ρ</i><sub>f</sub>','Free charge density (charge you place or remove)','C/m³'],
+    ['<i>ρ</i><sub>b</sub>, <i>σ</i><sub>b</sub>','Bound charge: −∇·P in volume, P·n̂ on surfaces','C/m³, C/m²'],
+    [`${sw(COL.J)}${m.J}`,'Total current density = J<sub>f</sub> + J<sub>b</sub> + J<sub>p</sub>','A/m²'],
+    [`${m.J}<sub>f</sub>`,'Free current density (conduction)','A/m²'],
+    [`${m.J}<sub>b</sub>, <b>K</b><sub>b</sub>`,'Bound current: ∇×M in volume, M×n̂ on surfaces','A/m², A/m'],
+    [`${pd(m.D)}`,'Displacement current density','A/m²'],
+    ['<i>I</i>','Current','A'],
+    ['g','Material and vacuum constants'],
+    [e0,'Vacuum permittivity, 8.8541878128 × 10⁻¹²','F/m'],
+    [u0,'Vacuum permeability, 1.25663706212 × 10⁻⁶','N/A² = H/m'],
+    ['<i>ε</i> = <i>ε</i><sub>r</sub><i>ε</i><sub>0</sub>','Permittivity of a material; χ<sub>e</sub> = ε<sub>r</sub> − 1','F/m'],
+    ['<i>μ</i> = <i>μ</i><sub>r</sub><i>μ</i><sub>0</sub>','Permeability of a material; χ<sub>m</sub> = μ<sub>r</sub> − 1','H/m'],
+    ['<i>c</i>','Speed of light 1/√(μ₀ε₀) = 299 792 458','m/s'],
+    ['<i>n</i>','Refractive index √(ε<sub>r</sub>μ<sub>r</sub>)','—'],
+    ['g','Operators'],
+    ['∇','Del: (∂/∂x, ∂/∂y, ∂/∂z); gradient of a scalar','1/m'],
+    ['∇·','Divergence: net outflow per volume (sources/sinks)','1/m'],
+    ['∇×','Curl: circulation per area (rotation axis)','1/m'],
+    ['∂/∂<i>t</i>','Partial time derivative at a fixed point','1/s'],
+    ['∯, ∮, ∬','Closed-surface, closed-loop and open-surface integrals','—'],
+    ['g','Potentials, fluxes, energy'],
+    ['<i>V</i>, <i>φ</i>','Electric (scalar) potential; E = −∇φ − ∂A/∂t','V'],
+    [`${sw(COL.A)}${m.A}`,'Magnetic vector potential; B = ∇×A','T·m = Wb/m'],
+    ['<i>Φ</i><sub>E</sub>','Electric flux ∬E·da','V·m'],
+    ['∬<b>D</b>·d<b>a</b>','Displacement flux; through a closed surface = Q<sub>f,enc</sub>','C'],
+    ['<i>Φ</i><sub>B</sub>','Magnetic flux ∬B·da','Wb = T·m²'],
+    ['ℰ','Electromotive force ∮E·dl','V'],
+    ['<i>u</i>','Energy density ½(E·D + B·H)','J/m³'],
+    ['g','Waves'],
+    [`${sw(COL.k)}${m.k}`,'Wave vector, |k| = k = 2π/λ, points along propagation','rad/m'],
+    ['ω','Angular frequency 2πf','rad/s'],
+    ['<i>f</i>, <i>T</i>','Frequency and period (T = 1/f)','Hz, s'],
+    ['λ','Wavelength = c/f in vacuum','m'],
+    ['<i>E</i>₀, <i>φ</i>₀','Amplitude and phase constant of a wave','V/m, rad'],
+    ['<i>Z</i>₀','Impedance of free space μ₀c ≈ 376.73','Ω']];
+  $('vSym').innerHTML=`<div class="kicker">REFERENCE</div><h2>Symbols and SI units</h2><p class="sub">Colour chips match the arrows in every scene.</p>
+    <div class="sec symwrap"><table class="sym"><thead><tr><th>Symbol</th><th>Meaning</th><th>SI unit</th></tr></thead><tbody>${R.map(r=>r[0]==='g'?`<tr class="grp"><td colspan="3">${r[1]}</td></tr>`:`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</tbody></table></div>
+    <p class="note">Since the 2019 SI revision, μ₀ and ε₀ are measured quantities (no longer exact), while c, e and h are exact by definition. Their product still satisfies μ₀ε₀c² = 1.</p>`;
+}
+
+/* ================================================================
+   Scene switching
+   ================================================================ */
+function go(i){
+  app.i=i; const def=SCENES[i]; app.def=def;
+  clearGroup(world); app.t=0; app.dirty.clear();
+  app.P={}; def.params.forEach(p=>app.P[p.k]=p.v);
+  renderPanel(def);
+  makeAxes(def.axis, def.unit); axesGroup.visible=app.showAxes;
+  const root=new THREE.Group(); world.add(root);
+  app.inst=def.create({root,P:app.P});
+  app.inst.reset&&app.inst.reset();
+  app.inst.rebuild('*');
+  applyLabels();
+  resetView();
+  [...stepsNav.children].forEach((b,k)=>b.setAttribute('aria-current',k===i)); stepsNav.children[i].scrollIntoView({block:'nearest',inline:'nearest'});
+  try{ history.replaceState(null,'','#step-'+(i+1)); }catch(e){}
+  app.roRows=[]; updateReadout();
+}
+function resetView(){ const d=app.def; camera.position.set(...d.cam); controls.target.set(0,0,0); controls.update(); }
+function applyLabels(){ scene.traverse(o=>{ if (o.userData.isLabel && !o.userData.forceHidden) o.visible = app.showLabels && (o.userData.dep? app.P[o.userData.dep] : true); }); if (app.inst) app.dirty.add('*'); }
+
+/* transport */
+const bPlay=$('bPlay');
+function setPlay(on){ app.playing=on; bPlay.textContent=on?'❚❚':'▶'; bPlay.setAttribute('aria-label',on?'Pause':'Play'); }
+bPlay.onclick=()=>setPlay(!app.playing);
+$('bReset').onclick=()=>go(app.i);
+$('bSlow').onclick=()=>{ app.slow=!app.slow; $('bSlow').setAttribute('aria-pressed',app.slow); };
+$('spd').oninput=e=>{ app.speed=+e.target.value; $('spdO').textContent=app.speed.toFixed(2)+'×'; };
+$('bView').onclick=resetView;
+$('bAxes').onclick=()=>{ app.showAxes=!app.showAxes; axesGroup.visible=app.showAxes; $('bAxes').setAttribute('aria-pressed',app.showAxes); };
+$('bLabels').onclick=()=>{ app.showLabels=!app.showLabels; $('bLabels').setAttribute('aria-pressed',app.showLabels); applyLabels(); };
+window.addEventListener('keydown',e=>{ if (e.target.closest('input,select,textarea')) return; if (e.code==='Space'){ e.preventDefault(); setPlay(!app.playing); } else if (e.key==='ArrowRight') go(Math.min(SCENES.length-1,app.i+1)); else if (e.key==='ArrowLeft') go(Math.max(0,app.i-1)); });
+window.addEventListener('hashchange',()=>{ const m_=/^#step-(\d+)$/.exec(location.hash); if (m_){ const k=+m_[1]-1; if (k>=0&&k<SCENES.length&&k!==app.i) go(k); } });
+setPlay(app.playing);
+
+/* main loop */
+let last=performance.now(), lastRebuild=0;
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  const sdt = app.playing ? dt*app.speed*(app.slow?0.25:1) : 0;
+  app.t += sdt;
+  if (app.inst){
+    if (app.dirty.size && now-lastRebuild>40){ const k=[...app.dirty][0]; app.dirty.clear(); lastRebuild=now; try{ app.inst.rebuild(k); applyLabelsQuiet(); }catch(err){ console.error(err); } }
+    try{ app.inst.update(app.t, sdt); }catch(err){ console.error(err); }
+  }
+  controls.update(); renderer.render(scene,camera);
+  if (now-app.lastRO>140){ app.lastRO=now; try{ updateReadout(); }catch(err){ console.error(err); } }
+}
+function applyLabelsQuiet(){ if (!app.showLabels) world.traverse(o=>{ if (o.userData.isLabel) o.visible=false; }); }
+
+renderEqTab(); renderSymTab();
+function start(){ resize(); const m_=/^#step-(\d+)$/.exec(location.hash); let k=m_? Math.min(SCENES.length-1,Math.max(0,+m_[1]-1)) : 0; go(k); requestAnimationFrame(loop); }
+let started=false; const boot=()=>{ if (!started){ started=true; start(); } };
+if (document.fonts && document.fonts.ready){ document.fonts.ready.then(boot); setTimeout(boot,1800); } else boot();
+</script>
