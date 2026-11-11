@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f17">
+<link rel="icon" type="image/png" sizes="32x32" href="logo-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="logo-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta property="og:site_name" content="Light upon Light">
+<meta property="og:description" content="Interactive physics of light, optics and electromagnetism.">
+<meta property="og:image" content="social-card.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<style>html,body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+<title>Light upon Light</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Light upon Light: interactive physics projects on light, optics and electromagnetism.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap">
+<style>
+/* Layout: a dark optical bench. Live interference emblem as the hero, then a project shelf, then a short about. */
+:root{
+  --bg:#0b0f17; --bg2:#0f1520; --card:#121a26; --line:#222d3c; --fg:#e4e9f0; --muted:#93a1b3; --faint:#5f6d80; --white:#f6efe6;
+  --sp:linear-gradient(90deg,#7a3cff,#2f6bff,#14c7e0,#36d65a,#f5e23a,#ff9b2f,#ff3b3b);
+  --display:"Instrument Serif","Iowan Old Style","Palatino Linotype",Georgia,serif;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:16px/1.6 var(--sans)}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--white);outline-offset:3px;border-radius:4px}
+.wrap{max-width:1120px;margin:0 auto;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+
+.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:rgba(11,15,23,.86);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;align-items:center;gap:16px;padding-block:12px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+.brand img{width:34px;height:34px;border-radius:50%}
+.brand span{font:400 24px/1 var(--display);letter-spacing:.005em}
+.brand em{font-style:italic;color:var(--muted)}
+.nav nav{margin-left:auto;display:flex;gap:4px}
+.nav nav a{text-decoration:none;color:var(--muted);font-size:14px;padding:6px 10px;border-radius:6px}
+.nav nav a:hover{color:var(--fg);background:var(--card)}
+
+.hero .wrap{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:48px;align-items:center;padding-block:64px 56px}
+.eyebrow{font:500 12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+h1{font:400 clamp(52px,8vw,96px)/0.95 var(--display);margin:16px 0 0;letter-spacing:-.01em;text-wrap:balance}
+h1 em{font-style:italic;color:var(--muted)}
+.rule{height:3px;width:132px;border-radius:2px;background:var(--sp);margin:26px 0 22px;opacity:.9}
+.lede{font-size:18px;color:#c9d2dd;max-width:34ch;margin:0}
+.cta{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}
+.btn{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 18px;border-radius:999px;text-decoration:none;font-weight:500;font-size:15px;border:1px solid var(--line)}
+.btn.primary{background:var(--white);color:var(--bg);border-color:var(--white)}
+.btn:hover{border-color:var(--muted)}
+.btn.primary:hover{filter:brightness(1.06)}
+.emblem{position:relative;justify-self:center;width:min(100%,460px);aspect-ratio:1;max-width:100%}
+.emblem canvas,.emblem img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%}
+.emblem img{opacity:1;transition:opacity .6s}
+.emblem.live img{opacity:0}
+.emblem::after{content:"";position:absolute;inset:-1px;border-radius:50%;box-shadow:0 0 0 1px rgba(255,255,255,.06),0 30px 90px rgba(120,140,255,.08)}
+.caption{margin-top:12px;text-align:center;font:400 12.5px/1.5 var(--mono);color:var(--faint);grid-column:2}
+
+section{padding-block:56px}
+.sh{display:flex;align-items:baseline;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:28px;flex-wrap:wrap}
+h2{font:400 40px/1.1 var(--display);margin:0;text-wrap:balance}
+.sh p{margin:0;color:var(--muted);font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:20px}
+.card{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;text-decoration:none;min-width:0;transition:border-color .2s,transform .2s}
+a.card:hover{border-color:#3a4a5f;transform:translateY(-2px)}
+.thumb{aspect-ratio:16/9;background:var(--bg2);border-bottom:1px solid var(--line);display:block;width:100%;max-width:100%}
+.thumb svg,.thumb img{width:100%;height:100%;display:block;object-fit:cover}
+.body{padding:18px 20px 20px;display:flex;flex-direction:column;gap:8px;flex:1}
+.meta{display:flex;gap:8px;align-items:center;font:500 11.5px var(--mono);color:var(--faint);letter-spacing:.04em}
+.pill{border:1px solid #2f6b46;color:#7fe0a2;border-radius:999px;padding:2px 8px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase}
+.pill.soon{border-color:var(--line);color:var(--muted)}
+.card h3{font:400 28px/1.15 var(--display);margin:2px 0 0}
+.card p{margin:0;color:#b9c4d1;font-size:15px}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;padding-top:10px}
+.tags span{font-size:12px;color:var(--muted);background:var(--bg2);border:1px solid var(--line);border-radius:6px;padding:2px 8px}
+.go{margin-top:6px;font-size:14px;font-weight:500;color:var(--white)}
+.card.soon{border-style:dashed;background:transparent}
+.card.soon .thumb{display:grid;place-items:center;color:var(--faint);font:400 15px var(--display);font-style:italic}
+
+.about .wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:48px}
+.about p{color:#c3ccd7;max-width:62ch;margin:0 0 14px}
+.about dl{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;margin:18px 0 0;font-size:14px}
+.about dt{color:var(--faint);font-family:var(--mono);font-size:12.5px;padding-top:2px}
+.about dd{margin:0;color:#c3ccd7}
+
+footer{border-top:1px solid var(--line);color:var(--faint);font-size:13px}
+footer .wrap{display:flex;justify-content:space-between;gap:16px;padding-block:24px;flex-wrap:wrap}
+
+@media (max-width:820px){
+  .hero .wrap{grid-template-columns:1fr;gap:32px;padding-block:36px 24px}
+  .emblem{order:-1;width:min(100%,340px)}
+  .caption{grid-column:1}
+  .about .wrap{grid-template-columns:1fr;gap:12px}
+  .nav nav a{padding:6px 7px}
+  .brand span{font-size:21px}
+}
+@media (prefers-reduced-motion:reduce){ a.card:hover{transform:none} }
+</style>
+</head>
+<body>
+
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Light upon Light, home"><img src="logo-64.png" alt="" width="34" height="34"><span>Light <em>upon</em> Light</span></a>
+    <nav aria-label="Sections"><a href="#projects">Projects</a><a href="#about">About</a></nav>
+  </div>
+</header>
+
+<main id="top">
+  <div class="hero">
+    <div class="wrap">
+      <div>
+        <div class="eyebrow">Optics · Electromagnetism · Interactive</div>
+        <h1>Light <em>upon</em> Light</h1>
+        <div class="rule" aria-hidden="true"></div>
+        <p class="lede">Physics of light and fields, built to be explored: rotate it, change it, watch what happens.</p>
+        <div class="cta"><a class="btn primary" id="ctaLatest" href="maxwell-3d.html">Open Maxwell in 3D →</a><a class="btn" href="#projects">All projects</a></div>
+      </div>
+      <div>
+        <div class="emblem" id="emblem"><img src="logo-512.png" alt="Light upon Light emblem: white-light interference of two coherent sources, a white central fringe flanked by dark and spectral fringes" width="512" height="512"><canvas id="hero" aria-hidden="true"></canvas></div>
+        <div class="caption">Two coherent sources, 400–700 nm. Bright: waves in phase. Dark: out of phase.</div>
+      </div>
+    </div>
+  </div>
+
+  <section id="projects">
+    <div class="wrap">
+      <div class="sh"><h2>Projects</h2><p id="count"></p></div>
+      <div class="grid" id="grid"></div>
+    </div>
+  </section>
+
+  <section class="about" id="about">
+    <div class="wrap">
+      <h2>About</h2>
+      <div>
+        <p>Light upon Light is a home for interactive physics: visual, hands-on explanations of optics and electromagnetism that you can explore in the browser, with correct physics and SI units.</p>
+        <p>The emblem is a real calculation, not a drawing. Two point sources emit the whole visible spectrum in phase. Where their waves arrive together, light adds to light (constructive interference, the white central fringe). Where they arrive half a wavelength apart, they cancel (destructive interference, the dark bands). Because each colour has its own wavelength, the higher-order fringes split into spectra.</p>
+        <dl><dt>Built with</dt><dd>HTML, CSS, JavaScript, WebGL (Three.js)</dd><dt>Runs</dt><dd>In any modern browser, on desktop and phone</dd></dl>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap"><span>© <span id="yr">2026</span> Light upon Light</span><span>Made with light, fields and a little code.</span></div></footer>
+
+<script>
+"use strict";
+/* ============================================================
+   PROJECTS: to add a project, copy one entry and edit it.
+   href   : path to the project's page
+   thumb  : an image path (e.g. "my-project.jpg") or one of the built-in drawings: "wave"
+   status : "Live" or "Coming soon"
+   ============================================================ */
+const PROJECTS = [
+  {
+    title: "Maxwell in 3D",
+    href: "maxwell-3d.html",
+    blurb: "All four Maxwell equations as an interactive 3D lab: thirteen animated steps from point charges to a radiating dipole, with live SI readouts.",
+    tags: ["Electromagnetism", "3D", "13 steps"],
+    date: "Nov 2026",
+    status: "Live",
+    thumb: "wave"
+  },
+  {
+    title: "Double Slit Lab",
+    href: "double-slit.html",
+    blurb: "One particle's wavefunction passing through two slits, computed with the real Schrödinger (or Maxwell) equation, plus two centuries of debate from Young to Feynman and the quantum eraser.",
+    tags: ["Quantum mechanics", "Wavepackets", "History"],
+    date: "Nov 2026",
+    status: "Live",
+    thumb: "slits"
+  }
+];
+
+const DRAWINGS = {
+  slits: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Wave passing two slits and forming interference fringes on a screen">
+    <rect width="320" height="180" fill="#0f1520"/>
+    ${(()=>{ let o=''; for(let r=8;r<150;r+=9){ o+=`<path d="M 120 ${70} m 0 ${-r} a ${r} ${r} 0 0 1 0 ${2*r}" fill="none" stroke="#7fd1ff" stroke-opacity="${(0.55-r/320).toFixed(2)}" stroke-width="1.2"/>`;
+        o+=`<path d="M 120 ${110} m 0 ${-r} a ${r} ${r} 0 0 1 0 ${2*r}" fill="none" stroke="#7fd1ff" stroke-opacity="${(0.55-r/320).toFixed(2)}" stroke-width="1.2"/>`; }
+      for(let x=24;x<112;x+=9) o+=`<line x1="${x}" y1="40" x2="${x}" y2="140" stroke="#7fd1ff" stroke-opacity=".45" stroke-width="1.2"/>`;
+      for(let y=10;y<170;y+=3){ const t=(y-90)/22, I=Math.cos(t*Math.PI)**2*Math.exp(-Math.pow((y-90)/60,2)); o+=`<rect x="286" y="${y}" width="${(4+22*I).toFixed(1)}" height="2.2" fill="#f4efe3" opacity="${(0.15+0.85*I).toFixed(2)}"/>`; }
+      return o; })()}
+    <rect x="114" y="10" width="8" height="52" fill="#5b6b80"/><rect x="114" y="78" width="8" height="24" fill="#5b6b80"/><rect x="114" y="118" width="8" height="52" fill="#5b6b80"/>
+    <line x1="284" y1="8" x2="284" y2="172" stroke="#ff8aa0" stroke-width="1.5"/>
+  </svg>`,
+  wave: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Electric and magnetic field waves at right angles">
+    <rect width="320" height="180" fill="#0f1520"/>
+    <g stroke="#2a3646" stroke-width="1"><line x1="30" y1="112" x2="300" y2="62"/><line x1="160" y1="30" x2="160" y2="150" stroke-dasharray="3 4"/></g>
+    ${(()=>{ let e='',b=''; for(let i=0;i<=54;i++){ const t=i/54, x=30+270*t, y=112-50*t, ph=t*Math.PI*4.2; const a=Math.sin(ph);
+        e+=`<line x1="${x}" y1="${y}" x2="${x}" y2="${y-48*a}" stroke="#ff8c42" stroke-width="1.4" opacity="${.35+.65*Math.abs(a)}"/>`;
+        b+=`<line x1="${x}" y1="${y}" x2="${x+30*a}" y2="${y+14*a}" stroke="#3a8dff" stroke-width="1.4" opacity="${.35+.65*Math.abs(a)}"/>`; }
+        return b+e; })()}
+    <text x="40" y="40" fill="#ff8c42" font-family="Georgia,serif" font-weight="700" font-size="18">E</text>
+    <text x="60" y="150" fill="#3a8dff" font-family="Georgia,serif" font-weight="700" font-size="18">B</text>
+    <text x="292" y="52" fill="#9fb0c8" font-family="Georgia,serif" font-weight="700" font-size="18">k</text>
+  </svg>`
+};
+
+const grid = document.getElementById('grid');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+PROJECTS.forEach(p => {
+  const live = p.status !== 'Coming soon' && p.href;
+  const el = document.createElement(live ? 'a' : 'div');
+  el.className = 'card' + (live ? '' : ' soon');
+  if (live) el.href = p.href;
+  const thumb = p.thumb ? (DRAWINGS[p.thumb] || `<img src="${esc(p.thumb)}" alt="" loading="lazy">`) : '<span>coming soon</span>';
+  el.innerHTML = `<div class="thumb">${thumb}</div><div class="body">
+      <div class="meta"><span class="pill${live?'':' soon'}">${esc(p.status)}</span>${p.date?`<span>${esc(p.date)}</span>`:''}</div>
+      <h3>${esc(p.title)}</h3><p>${esc(p.blurb)}</p>
+      <div class="tags">${(p.tags||[]).map(t=>`<span>${esc(t)}</span>`).join('')}</div>
+      ${live?'<span class="go">Open project →</span>':''}</div>`;
+  grid.appendChild(el);
+});
+const liveCount = PROJECTS.filter(p => p.status !== 'Coming soon').length;
+document.getElementById('count').textContent = `${liveCount} live project${liveCount===1?'':'s'}`;
+document.getElementById('yr').textContent = new Date().getFullYear();
+
+/* ============================================================
+   Live emblem: white-light two-source interference in a WebGL shader.
+   24 wavelengths from 400 to 700 nm, CIE 1931 colour matching, sRGB output.
+   The relative phase of the sources drifts slowly, so the fringes sweep.
+   ============================================================ */
+(function(){
+  const box = document.getElementById('emblem'), cv = document.getElementById('hero');
+  let gl; try { gl = cv.getContext('webgl', {premultipliedAlpha:false, antialias:false}); } catch(e) {}
+  if (!gl) return;
+  const vs = `attribute vec2 p; void main(){ gl_Position=vec4(p,0.,1.); }`;
+  const fs = `precision highp float;
+  uniform vec2 uRes; uniform float uT;
+  float gs(float l,float m,float a,float b){ float s=l<m?a:b; float x=(l-m)/s; return exp(-.5*x*x); }
+  vec3 cmf(float l){ return vec3(1.056*gs(l,599.8,37.9,31.0)+0.362*gs(l,442.0,16.0,26.7)-0.065*gs(l,501.1,20.4,26.2),
+                                 0.821*gs(l,568.8,46.9,40.5)+0.286*gs(l,530.9,16.3,31.1),
+                                 1.217*gs(l,437.0,11.8,36.0)+0.681*gs(l,459.0,26.0,13.8)); }
+  void main(){
+    vec2 uv=(gl_FragCoord.xy-.5*uRes)/uRes.y; float R=length(uv)*2.;
+    if (R>1.0){ gl_FragColor=vec4(0.); return; }
+    vec2 q=uv*8.0; float d=2.0+0.12*sin(uT*.21); float ph=1.15*sin(uT*.17);
+    float r1=length(q-vec2(.5*d,0.))+.04, r2=length(q+vec2(.5*d,0.))+.04;
+    vec3 xyz=vec3(0.); float ys=0.;
+    for (int i=0;i<24;i++){ float l=400.+300.*(float(i)+.5)/24.; float k=6.2831853/(l*1e-3);
+      vec2 E=vec2(cos(k*r1),sin(k*r1))/r1+vec2(cos(k*r2+ph),sin(k*r2+ph))/r2;
+      vec3 c=cmf(l); xyz+=dot(E,E)*c; ys+=c.y; }
+    xyz/=ys;
+    vec3 rgb=mat3(3.2406,-0.9689,0.0557, -1.5372,1.8758,-0.2040, -0.4986,0.0415,1.0570)*xyz;
+    float Y=max(xyz.y,1e-6); float env=pow(clamp(1.-R*R,0.,1.),1.2);
+    rgb*= (1.-exp(-.6*Y))*env/Y;
+    float L=(rgb.r+rgb.g+rgb.b)/3.; rgb=L+(rgb-L)*1.25;
+    rgb=clamp(rgb,0.,1.);
+    rgb=mix(12.92*rgb,1.055*pow(rgb,vec3(1./2.4))-.055,step(.0031308,rgb));
+    rgb=max(rgb,vec3(11.,15.,23.)/255.);
+    float rim=clamp(1.-abs(R-.965)/.008,0.,1.)*.22; rgb+=rim;
+    float a=clamp((.985-R)/.006,0.,1.);
+    gl_FragColor=vec4(rgb,a);
+  }`;
+  const sh = (t,s) => { const o=gl.createShader(t); gl.shaderSource(o,s); gl.compileShader(o); if(!gl.getShaderParameter(o,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
+  let prog; try { prog=gl.createProgram(); gl.attachShader(prog,sh(gl.VERTEX_SHADER,vs)); gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,fs)); gl.linkProgram(prog); if(!gl.getProgramParameter(prog,gl.LINK_STATUS)) throw 0; } catch(e){ return; }
+  gl.useProgram(prog);
+  const buf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buf); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+  const loc=gl.getAttribLocation(prog,'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+  const uRes=gl.getUniformLocation(prog,'uRes'), uT=gl.getUniformLocation(prog,'uT');
+  const still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function size(){ const s=Math.round(cv.clientWidth*Math.min(2,window.devicePixelRatio||1)); if (s && cv.width!==s){ cv.width=cv.height=s; gl.viewport(0,0,s,s); } }
+  let t0=performance.now(), visible=true, raf=0;
+  function frame(now){ size(); gl.uniform2f(uRes,cv.width,cv.height); gl.uniform1f(uT,still?0:(now-t0)/1000); gl.drawArrays(gl.TRIANGLES,0,3); box.classList.add('live'); if(!still && visible) raf=requestAnimationFrame(frame); }
+  new IntersectionObserver(es=>{ visible=es[0].isIntersecting; if (visible && !still){ cancelAnimationFrame(raf); raf=requestAnimationFrame(frame); } }).observe(cv);
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
