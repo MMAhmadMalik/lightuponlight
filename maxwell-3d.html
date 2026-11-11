@@ -1,3 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f17">
+<link rel="icon" type="image/png" sizes="32x32" href="logo-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="logo-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta property="og:site_name" content="Light upon Light">
+<meta property="og:description" content="Maxwell's equations as an interactive 3D lab: 13 animated steps with live SI readouts.">
+<meta property="og:image" content="social-card.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<style>html,body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
 <title>Maxwell in 3D</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -146,10 +160,13 @@ table.sym tr.grp td{font:600 11px var(--cond);letter-spacing:.08em;text-transfor
 }
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 </style>
+</head>
+<body>
+
 
 <div class="app">
   <header class="top">
-    <div class="brand"><a class="home" href="../../index.html" title="Back to Light upon Light"><img src="../../assets/logo-64.png" alt="Light upon Light home" width="38" height="38"></a><div><h1>Maxwell in 3D</h1><p><a href="../../index.html">Light upon Light</a> · Interactive field lab</p></div></div>
+    <div class="brand"><a class="home" href="index.html" title="Back to Light upon Light"><img src="logo-64.png" alt="Light upon Light home" width="38" height="38"></a><div><h1>Maxwell in 3D</h1><p><a href="index.html">Light upon Light</a> · Interactive field lab</p></div></div>
     <div class="rail">
       <button class="navb" id="prev" aria-label="Previous step">‹</button>
       <nav class="steps" id="steps" aria-label="Steps"></nav>
@@ -1546,3 +1563,6 @@ function start(){ resize(); const m_=/^#step-(\d+)$/.exec(location.hash); let k=
 let started=false; const boot=()=>{ if (!started){ started=true; start(); } };
 if (document.fonts && document.fonts.ready){ document.fonts.ready.then(boot); setTimeout(boot,1800); } else boot();
 </script>
+
+</body>
+</html>
